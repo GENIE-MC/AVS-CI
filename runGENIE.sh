@@ -1,5 +1,8 @@
 #!/bin/bash
 
+
+echo "@: $@"
+
 while getopts p:v:o:i:l:c:d:r: OPT
 do
   case ${OPT} in
@@ -44,10 +47,10 @@ done
 # source $GUPSBASE/products/genie/externals/setup
 
 # bootstrap setup off larsoft repo...
-# ---> source /grid/fermiapp/products/genie/bootstrap_genie_ups.sh
+# ---> source /cvmfs/fermilab.opensciencegrid.org/products/genie/bootstrap_genie_ups.sh
 source /cvmfs/fermilab.opensciencegrid.org/products/genie/bootstrap_genie_ups.sh
 
-# These don't need to be debug 
+# These don't need to be debug
 #
 #setup root v5_34_25a -q debug:e7:nu
 #setup lhapdf v5_9_1b -q debug:e7
@@ -69,18 +72,68 @@ setup log4cpp v1_1_2 -q e14:prof
 export LD_LIBRARY_PATH=$GENIE/lib:$GENIE_COMPARISONS/lib:$LD_LIBRARY_PATH
 export PATH=$GENIE/bin:$GENIE_COMPARISONS/bin:$PATH
 
-echo "Command: "$cmd > $log
-# echo "Input folder: " >> $log
-# ls -lh input >> $log
-echo "LD_LIBRARY_PATH = $LD_LIBRARY_PATH" >> $log
-echo "PATH = $PATH" >> $log
-echo "GENIE = $GENIE" >> $log
-echo "Contents of GENIE/bin: " >> $log
-echo `ls $GENIE/bin` >> $log
-echo "Running command" >> $log
+echo "Command: "$cmd | tee $log
+# echo "Input folder: " | tee -a $log
+# ls -lh input | tee -a $log
+echo "LD_LIBRARY_PATH = $LD_LIBRARY_PATH" | tee -a $log
+echo "PATH = $PATH" | tee -a $log
+echo "GENIE = $GENIE" | tee -a $log
+echo "Contents of GENIE/bin: " | tee -a $log
+echo `ls $GENIE/bin` | tee -a $log
+echo "Running command" | tee -a $log
 
 source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups.sh
 setup ifdhc
+
+export IFDH_CP_MAXRETRIES=3
+
+traperror () {
+    local err=$1 # error status
+    local line=$2 # LINENO
+    local linecallfunc=$3
+    local command="$4"
+    local funcstack="$5"
+    local errorfatal="${6:-1}"
+    errorfatal=0 # force traperror to exit using return
+    local CI_GRID_ERR_MSG=$(
+    echo -e "### $0 MSG BEGIN"
+    echo "ERROR: line $line - command '$command' exited with status: $err"
+    if [ "$funcstack" != "::" ]; then
+        echo -n "   ... Error at ${funcstack} "
+        if [ "$linecallfunc" != "" ]; then
+            echo -n "called at line $linecallfunc"
+        fi
+    else
+        echo -n "   ... internal debug info from function ${FUNCNAME} (line $linecallfunc)"
+    fi
+
+    echo
+
+    echo
+    echo -e "### $0 MSG END")
+
+    echo "${CI_GRID_ERR_MSG}"
+
+    if [ "$errorfatal" -ne "0" ]; then
+        echo "traperror exit: ${err}"
+        export ci_traperror_exit_code=${err}
+        echo "ci_traperror_exit_code: ${ci_traperror_exit_code}"
+        exit ${err}
+    else
+        echo "traperror return: ${err}"
+        export ci_traperror_exit_code=${err}
+        echo "ci_traperror_exit_code: ${ci_traperror_exit_code}"
+        return ${err}
+    fi
+
+}
+
+type traperror
+trap
+trap 'traperror $? $LINENO $BASH_LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]}) $ERRORFATAL' ERR
+trap
+
+ERRORFATAL=1 ### this is overridden by traperror function
 
 ### load input (if defined) ###
 
@@ -95,8 +148,7 @@ cp -r $GENIE_COMPARISONS/data .
 
 if [ "$input" != "none" ]; then
 
-    echo "input is not none..."
-    echo "input is not none..." >> $log
+    echo "input is not none..." | tee -a $log
 
 for token in "${input[@]}"
 do
@@ -105,23 +157,18 @@ do
     ipat=`basename "$token"`
 # -->     idir=`dirname "$input"` 
 # -->    ipat=`basename "$input"`
-    echo "idir = $idir"
-    echo "idir = $idir" >> $log
-    echo "ipat = $ipat"
-    echo "ipat = $ipat" >> $log
+    echo "idir = $idir" | tee -a $log
+    echo "ipat = $ipat" | tee -a $log
     # recall that `findMatchingFiles` recursively scans subdirs
-    ifdh findMatchingFiles "$idir" "$ipat"
-    ifdh findMatchingFiles "$idir" "$ipat" >> $log
+    ifdh findMatchingFiles "$idir" "$ipat" | tee -a $log
     inputlist=`ifdh findMatchingFiles "$idir" "$ipat"`
 
-    echo "making local input storage folder if not there yet.."
-    echo "making local input storage folder if not there yet.." >> $log
+    echo "making local input storage folder if not there yet.." | tee -a $log
     if [ ! -d "input" ]; then
        mkdir input
     fi
 
-    echo "running ifdh fetch"
-    echo "running ifdh fetch" >> $log
+    echo "running ifdh fetch" | tee -a $log
     IFDH_DATA_DIR=./input ifdh fetchSharedFiles $inputlist
 
     if [ "$debug" == "true" ]
@@ -129,8 +176,8 @@ do
         echo "Checking contents of local input folder: "
         ls -lh input
     fi
-    echo "Checking contents of local input folder: " >> $log
-    ls -lh input >> $log
+    echo "Checking contents of local input folder: " | tee -a $log
+    ls -lh input | tee -a $log
 
 done # end loop over tokens in input
 
@@ -140,20 +187,16 @@ echo "regre = $regre"
 
 if [ "$regre" != "none" ]; then
 
-    echo "regression test requested..."
-    echo "regression test requested..." >> $log
+    echo "regression test requested..." | tee -a $log
 
 for rtoken in "${regre[@]}"
 do
 
     rpat=`basename "$rtoken"`
     rdir=`dirname "$rtoken"`
-    echo "rdir = $rdir"
-    echo "rdir = $rdir" >> $log
-    echo "rpat = $rpat"
-    echo "rpat = $rpat" >> $log
-    ifdh findMatchingFiles "$rdir" "$rpat"
-    ifdh findMatchingFiles "$rdir" "$rpat" >> $log
+    echo "rdir = $rdir" | tee -a $log
+    echo "rpat = $rpat" | tee -a $log
+    ifdh findMatchingFiles "$rdir" "$rpat" | tee -a $log
     regrelist=`ifdh findMatchingFiles "$rdir" "$rpat"`
    
     exp=`basename "$rdir"`
@@ -162,21 +205,14 @@ do
     rdate=`basename "$d2"`
     d3=`dirname "$d2"`
     rversion=`basename "$d3"`
-    echo "exp = $exp"
-    echo "exp = $exp" >> $log
-    echo "d1 = $d1"
-    echo "d1 = $d1" >> $log
-    echo "d2 = $d2"
-    echo "d2 = $d2" >> $log
-    echo "rdate = $rdate"
-    echo "rdate = $rdate" >> $log
-    echo "d3 = $d3"
-    echo "d3 = $d3" >> $log
-    echo "rversion = $rversion"
-    echo "rversion = $rversion" >> $log
+    echo "exp = $exp" | tee -a $log
+    echo "d1 = $d1" | tee -a $log
+    echo "d2 = $d2" | tee -a $log
+    echo "rdate = $rdate" | tee -a $log
+    echo "d3 = $d3" | tee -a $log
+    echo "rversion = $rversion" | tee -a $log
    
-    echo "making local input/regression folder if not there yet.."
-    echo "making local input/regression folder if not there yet.." >> $log
+    echo "making local input/regression folder if not there yet.." | tee -a $log
     if [ ! -d "input/regre" ]; then
        mkdir input/regre
     fi
@@ -187,17 +223,11 @@ do
        mkdir input/regre/$rversion/$rdate
     fi
 
-    echo "running ifdh fetch for regression MC files"
-    echo "running ifdh fetch for regression MC files" >> $log
+    echo "running ifdh fetch for regression MC files" | tee -a $log
     IFDH_DATA_DIR=./input/regre/$rversion/$rdate ifdh fetchSharedFiles $regrelist
 
-    if [ "$debug" == "true" ]
-    then
-        echo "Checking contents of local input/regression folder: "
-        ls -lh input/regre/$rversion/$rdate
-    fi
-    echo "Checking contents of local input/regression folder: " >> $log
-    ls -lh input/regre/$rversion/$rdate >> $log   
+    echo "Checking contents of local input/regression folder: " | tee -a $log
+    ls -lh input/regre/$rversion/$rdate | tee -a $log
 
 done # end loop over rtokens in regre
 
@@ -208,7 +238,7 @@ fi # check `regre == "none" `
 if [ "$debug" == "true" ]
 then
   echo "DEBUG MODE ON. ALL OUTPUT WILL BE COPIED TO LOG FILE"
-  $cmd >> $log
+  $cmd | tee -a $log
     # TODO: "grid debug" -> put output into grid log file?
     # $cmd
 else
@@ -233,13 +263,17 @@ done
 rm -f input-flux.root
 
 mkdir scratch
-mv *.root scratch
-mv *.xml scratch
-mv *.log scratch
-mv *.eps scratch
-mv *.ps scratch
-mv *.pdf scratch
-mv *.txt scratch
+for f in $(find . -maxdepth 1 -type f -name \*.root -printf "%P\n" -o -name \*.xml -printf "%P\n" -o -name \*.log -printf "%P\n" -o -name \*.eps -printf "%P\n" -o -name \*.ps -printf "%P\n" -o -name \*.pdf -printf "%P\n" -o -name \*.txt -printf "%P\n" | sort )
+do
+  mv -v ${f} scratch
+done
+
+### mv *.root scratch
+### mv *.xml scratch
+### mv *.log scratch
+### mv *.eps scratch
+### mv *.ps scratch
+### mv *.pdf scratch
 
 if [ "$debug" == "true" ]
 then
@@ -261,10 +295,8 @@ find . -type d -exec echo ifdh mkdir $out/{} \; | sed -e "s%\./%%g" >> copy_file
 find . -type f -exec echo ifdh cp {} $out/{} \; | sed -e "s%\./%%g" >> copy_files.sh
 # now take `copy_files.sh` out of the file copy script
 perl -ni -e 'print if !/copy_files/' copy_files.sh
-echo "file copy script contents:"
-cat copy_files.sh
-echo "file copy script contents:" >> $log
-cat copy_files.sh >> $log
+echo "file copy script contents:" | tee -a $log
+cat copy_files.sh | tee -a $log
 set -x
 source copy_files.sh
 set +x
@@ -274,3 +306,7 @@ cd ..
 # jobsub_submit -G genie -M --OS=SL6 --resource-provides=usage_model=DEDICATED,OPPORTUNISTIC file://runGENIE.sh -p /grid/fermiapp/genie/builds/genie_R-2_9_0_buildmaster_2015-10-27/ -o /pnfs/genie/scratch/users/goran/ -c "gmkspl -p 12 -t 1000010010 -n 500 -e 500 -o scratch/pgxspl-qel.xml --event-generator-list QE"
 # temporary solution: use SPACE instead of spaces
 # jobsub_submit -G genie -M --OS=SL6 --resource-provides=usage_model=DEDICATED,OPPORTUNISTIC file://runGENIE.sh -p /grid/fermiapp/genie/builds/genie_R-2_9_0_buildmaster_2015-10-27/ -o /pnfs/genie/scratch/users/goran/ -c "gmksplSPACE-pSPACE12SPACE-tSPACE1000010010SPACE-nSPACE500SPACE-eSPACE500SPACE-oSPACEscratch/pgxspl-qel.xmlSPACE--event-generator-listSPACEQE"
+
+trap
+
+exit ${ci_traperror_exit_code}
