@@ -123,7 +123,8 @@ def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, re
    for key in data_struct.iterkeys():
       inFile = "cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"
       outFile = "genie_" + tag + "_" + data_struct[key]['releaselabel']
-      cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile
+      tablechi2 = "genie_" + tag + "_" + data_struct[key]['releaselabel'] + "-summary-chi2.txt"
+      cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile + " --summary-chi2-table " + tablechi2
       logfile = data_struct[key]['releaselabel'] + ".log"
       jobsub.addJob ( inputs, reportdir, logfile, cmd, regre )
 
