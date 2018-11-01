@@ -86,6 +86,13 @@ echo "PATH = $PATH" | tee -a $log
 echo "GENIE = $GENIE" | tee -a $log
 echo "Contents of GENIE/bin: " | tee -a $log
 echo `ls $GENIE/bin` | tee -a $log
+#########################
+echo ${LD_LIBRARY_PATH} | tr ":" "\n" | tee -a $log
+echo ${PATH} | tr ":" "\n" | tee -a $log
+pwd | tee -a $log
+ls -lh | tee -a $log
+which gmkspl | tee -a $log
+##########################
 echo "Running command" | tee -a $log
 
 source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups.sh
