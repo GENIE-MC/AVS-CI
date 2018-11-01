@@ -244,6 +244,16 @@ fi # check `regre == "none" `
 
 ### run the command ###
 
+#### DEBUG INFO BEGIN ####
+echo "*** Debug info ***"
+echo "*** start environment dump***"
+env | sort
+echo "*** end environment dump***"
+
+set -x
+#### DEBUG INFO END ####
+
+
 if [ "$debug" == "true" ]
 then
   echo "DEBUG MODE ON. ALL OUTPUT WILL BE COPIED TO LOG FILE"
