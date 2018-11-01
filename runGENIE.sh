@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -x
+set -o
+
 echo "@: $@"
 
 while getopts p:v:o:i:l:c:d:r: OPT
@@ -262,7 +265,7 @@ then
     # $cmd
 else
     # GENIE is pretty chatty, only save errors to log file
-  $cmd 1>/dev/null 2>$log
+  eval $cmd 1>/dev/null 2>$log
 fi
 
 ### check for NaN's in the (output splines) XML files
