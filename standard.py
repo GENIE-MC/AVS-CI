@@ -120,12 +120,12 @@ generatorList = {
   '9203' : 'IMD',
   '9204' : 'IMD'}
 
-def fillDAG (jobsub, tag, paths, regretags=None, regredir=None):
-  fillDAG_GHEP (jobsub, tag, paths['xsec_A'], paths['mctest'])
+def fillDAG (jobsub, tag, paths, main_tune, regretags=None, regredir=None):
+  fillDAG_GHEP (jobsub, tag, paths['xsec_A'], paths['mctest'], main_tune )
   # --> NO need --> fillDAG_GST (jobsub, paths['mctest'])
-  fillDAG_sanity (jobsub, paths['mctest'], paths['sanity'])
+  fillDAG_sanity (jobsub, paths['mctest'], paths['sanity'], main_tune)
   
-def fillDAG_GHEP (jobsub, tag, xsec_a_path, out):
+def fillDAG_GHEP (jobsub, tag, xsec_a_path, out, main_tune):
   # check if job is done already
   if isDoneGHEP (out):
     msg.warning ("Standard mctest ghep files found in " + out + " ... " + msg.BOLD + "skipping standard:fillDAG_GHEP\n", 1)
@@ -136,7 +136,12 @@ def fillDAG_GHEP (jobsub, tag, xsec_a_path, out):
   jobsub.add ("<parallel>")
   # common options
   inputFile = "gxspl-vA-" + tag + ".xml"
+  if not ( main_tune is None):
+     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
   options = " --seed " + mcseed + " --cross-sections input/" + inputFile
+  if not (main_tune is None):
+     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
+     options = options + " --tune " + main_tune
   # loop over keys and generate gevgen command
   for key in nuPDG.iterkeys():
     cmd = "gevgen -n " + nEvents[key] + " -e " + energy[key] + " -p " + nuPDG[key] + " -t " + targetPDG[key] + \
@@ -164,7 +169,7 @@ def fillDAG_GST (jobsub, out):
   # done
   jobsub.add ("</parallel>")
 
-def fillDAG_sanity (jobsub, events, out):
+def fillDAG_sanity ( jobsub, events, out, main_tune ):
   # check if job is done already
   if isDoneSanity (out):
     msg.warning ("Standard mctest sanity checks log files found in " + out + " ... " + msg.BOLD + \
@@ -188,9 +193,12 @@ def fillDAG_sanity (jobsub, events, out):
   for key in nuPDG.iterkeys():
     inputFile = "gntp." + key + ".ghep.root"
     output = "gntp." + key + ".ghep.root.sanity.log"
+    logFile = "gevscan." + key + ".log"
+    if not (main_tune is None):
+       output = main_tune + "-gntp." + key + ".ghep.root.sanity.log"
+       logFile = main_tune + "-gevscan." + key + ".log"
 # --> old name -->    cmd = "gvld_sample_scan -f input/" + inputFile + " -o " + output + options
     cmd = "gevscan -f input/" + inputFile + " -o " + output + options
-    logFile = "gevscan." + key + ".log"
     jobsub.addJob (events + "/" + inputFile, out, logFile, cmd, None)
   # done
   jobsub.add ("</parallel>")

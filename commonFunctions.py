@@ -5,7 +5,7 @@ import os
 # this is general enough to put in here 
 nevents="100000"
 
-def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, tunes ):
+def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 
    if eventFilesExist( data_struct, out, tunes):
       msg.warning ( meta['Experiment'] + " test ghep files found in " + out + " ... " + msg.BOLD + "skipping " + meta['Emperiment'].lower() + ":fillDAG_GHEP\n", 1)
@@ -19,6 +19,9 @@ def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, tunes ):
    # common configuration
    inputxsec = "gxspl-vA-" + tag + ".xml"
    options = " -t " + meta['target'] + " --cross-sections input/" + inputxsec 
+   if not (main_tune is None):
+      inputxsec = main_tune + "-gxspl-vA-" + tag + ".xml"
+      options = options + " --tune " + main_tune
 
    for key in data_struct.iterkeys():
      opt = options + " -n " + nevents
@@ -38,7 +41,7 @@ def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, tunes ):
    # done
    jobsub.add ("</parallel>")
  
-def createCmpConfigs( meta, data_struct, tag, date, reportdir, tunes, regretags ):
+def createCmpConfigs( meta, data_struct, tag, date, reportdir, main_tune, tunes, regretags ):
 
    for key in data_struct.iterkeys():
       gcfg = reportdir + "/cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"
@@ -73,9 +76,15 @@ def createCmpConfigs( meta, data_struct, tag, date, reportdir, tunes, regretags 
       xml = open( gsimfile, 'w' )
       print >>xml, '<?xml version="1.0" encoding="ISO-8859-1"?>'
       print >>xml, '<genie_simulation_outputs>'
-      print >>xml, '\t<model name="' + tag + '-' + date + ':default:' + data_struct[key]['releaselabel'] + '">'
+      if ( main_tune is None):
+         print >>xml, '\t<model name="' + tag + '-' + date + ':default:' + data_struct[key]['releaselabel'] + '">'
+      else:
+         print >>xml, '\t<model name="' + tag + '-' + date + ':' + main_tune + data_struct[key]['releaselabel'] + '">'
       print >>xml, '\t\t<evt_file format="ghep"> input/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
-      print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
+      if ( main_tune is None):
+         print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
+      else:
+         print >>xml, '\t\t<xsec_file> input/' + main_tune + '-xsec-vA-' + tag + '.root </xsec_file>'
       print >>xml, '\t</model>'
       #tunes if specified
       if not (tunes is None):
@@ -86,15 +95,23 @@ def createCmpConfigs( meta, data_struct, tag, date, reportdir, tunes, regretags 
 	    print >>xml, '\t</model>'
       # regression if specified
       if not (regretags is None):
+         # need to fetch date stamp for the regression from the leading path
+         # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+         # NOTE: redirect output of split(...) to a separate array; 
+         #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+         regredir_tmp = regredir.split("/")
+         rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
          for rt in range(len(regretags)):
-	    print >>xml, '\t<model name="' + regretags[rt] + ":default:" + data_struct[key]['releaselabel'] + '">'
+	    rversion, rtune = regretags[rt].split("/")
+	    # print >>xml, '\t<model name="' + regretags[rt] + ":default:" + data_struct[key]['releaselabel'] + '">'
+	    print >>xml, '\t<model name="' + rversion + '-' + rdate + ':' + rtune + ':' +  data_struct[key]['releaselabel'] + '">'
 	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
-            print >>xml, '\t\t<xsec_file> input/regre/'  + regretags[rt] + '/xsec-vA-' + rversion + '.root </xsec_file>'
+            print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
 	    print >>xml, '\t</model>'
       print >>xml, '</genie_simulation_outputs>'
       xml.close()   
 
-def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, reportdir, tunes, regretags, regredir ):
+def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, reportdir, main_tune, tunes, regretags, regredir ):
 
    # check if job is done already
    if resultsExist ( data_struct, tag, date, reportdir ):
@@ -108,6 +125,8 @@ def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, re
    jobsub.add ("<parallel>")
 
    inputs = reportdir + "/*.xml " + xsec_a_path + "/xsec-vA-" + tag + ".root " + eventdir + "/*.ghep.root "
+   if not (main_tune is None):
+      inputs = reportdir + "/*.xml " + xsec_a_path + "/" + main_tune + "-xsec-vA-" + tag + ".root " + eventdir + "/*.ghep.root "
    if not (tunes is None):
       for tn in range(len(tunes)):
 	 inputs = " " + inputs + xsec_a_path + "/" + tunes[tn] + "/" + tunes[tn] + "-xsec-vA-" + tag + ".root " \
@@ -117,8 +136,9 @@ def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, re
       regre = ""
       for rt in range(len(regretags)):
          bname = os.path.basename( eventdir )
+         rversion, rtune = regretags[rt].split("/")
+	 regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
          regre = regre + regredir + "/" + regretags[rt] + "/events/" + bname + "/*.ghep.root "
-         # ---> regre = regre + regredir + "/" + regretags[rt] + "/events/miniboone/*.ghep.root "
 
    for key in data_struct.iterkeys():
       inFile = "cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"

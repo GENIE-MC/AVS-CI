@@ -42,9 +42,13 @@ def getArgs(
             )
 
 # tune(s) (optional)
-    parser.add_argument("--tunes", action = "store", dest = "tunes",
+    parser.add_argument("--main_tune", action = "store", dest = "main_tune", 
+           metavar = "['main tune']", 
+	   help = "main/principal tune; D=Default (G18_02a as of R-3_00_00) (optional)"
+	   )
+    parser.add_argument("--add_tunes", action = "store", dest = "add_tunes",
            metavar = "['Tune1 Tune2 ...']", 
-	   help = "desired tune(s) (optional)"
+	   help = "desired tune(s) for benchmark with default/principal one (optional)"
 	   )
 
 # regression tests (optional)

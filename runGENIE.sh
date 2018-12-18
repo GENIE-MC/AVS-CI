@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-set -o
 
 echo "@: $@"
 
@@ -52,31 +50,30 @@ done
 # ---> source /cvmfs/fermilab.opensciencegrid.org/products/genie/bootstrap_genie_ups.sh
 source /cvmfs/fermilab.opensciencegrid.org/products/genie/bootstrap_genie_ups.sh
 
-# These don't need to be debug
-#
-#setup root v5_34_25a -q debug:e7:nu
-#setup lhapdf v5_9_1b -q debug:e7
-#setup log4cpp v1_1_1b -q debug:e7
-#
-# switch to the optimized ones
-#
+# old version
 #setup root v5_34_25a -q e7:nu:prof
 #setup lhapdf v5_9_1b -q e7:prof
 #setup log4cpp v1_1_1b -q e7:prof
 #
-# example of most up-to-date root5 !!!
+# most up-to-date root5 !!!
 # NOTE: there won't be any higher versons of Root5, at least at FNAL
 # setup root v5_34_36 -q e9:nu:prof 
 # setup lhapdf v5_9_1d -q e9:prof
 # setup log4cpp v1_1_1d -q e9:prof
 # setup boost v1_57_0a -q e9:prof
 #
-# switch to root6 for the gsl v2.3 bundled with it
-# also, use e14 qualifier(s)
+# obsolete version
+#setup root v6_10_04d -q e14:nu:prof
+#setup lhapdf v5_9_1h -q e14:prof
+#setup log4cpp v1_1_2 -q e14:prof
 #
-setup root v6_10_04d -q e14:nu:prof
-setup lhapdf v5_9_1h -q e14:prof
-setup log4cpp v1_1_2 -q e14:prof
+# Nov.21, 2018: Latest and greatest of root6, with e17 qualifier
+# NOTE: According to Robert H., no more need to have "nu" in the qualifier 
+#
+setup root v6_12_06a -q e17:prof
+setup lhapdf v5_9_1k -q e17:prof
+setup log4cpp v1_1_3a -q e17:prof
+setup boost v1_66_0a -q e17:prof
 
 export LD_LIBRARY_PATH=$GENIE/lib:$GENIE_COMPARISONS/lib:$LD_LIBRARY_PATH
 export PATH=$GENIE/bin:$GENIE_COMPARISONS/bin:$PATH
@@ -89,13 +86,6 @@ echo "PATH = $PATH" | tee -a $log
 echo "GENIE = $GENIE" | tee -a $log
 echo "Contents of GENIE/bin: " | tee -a $log
 echo `ls $GENIE/bin` | tee -a $log
-#########################
-echo ${LD_LIBRARY_PATH} | tr ":" "\n" | tee -a $log
-echo ${PATH} | tr ":" "\n" | tee -a $log
-pwd | tee -a $log
-ls -lh | tee -a $log
-which gmkspl | tee -a $log
-##########################
 echo "Running command" | tee -a $log
 
 source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups.sh
@@ -109,7 +99,8 @@ traperror () {
     local linecallfunc=$3
     local command="$4"
     local funcstack="$5"
-    local errorfatal="${6:-0}"  ### by default errors are not fatal; i.e. use return instead of exit
+    local errorfatal="${6:-1}"
+    errorfatal=0 # force traperror to exit using return
     local CI_GRID_ERR_MSG=$(
     echo -e "### $0 MSG BEGIN"
     echo "ERROR: line $line - command '$command' exited with status: $err"
@@ -143,9 +134,12 @@ traperror () {
 
 }
 
+type traperror
+trap
 trap 'traperror $? $LINENO $BASH_LINENO "$BASH_COMMAND" $(printf "::%s" ${FUNCNAME[@]}) $ERRORFATAL' ERR
+trap
 
-ERRORFATAL=0 ### errors are not fatal; i.e. use return instead of exit
+ERRORFATAL=1 ### this is overridden by traperror function
 
 ### load input (if defined) ###
 
@@ -197,7 +191,7 @@ fi  # check `input == none`
 
 echo "regre = $regre"
 
-if [ -n "$regre" -a "$regre" != "none" ]; then
+if [ "$regre" != "none" ]; then
 
     echo "regression test requested..." | tee -a $log
 
@@ -211,51 +205,41 @@ do
     ifdh findMatchingFiles "$rdir" "$rpat" | tee -a $log
     regrelist=`ifdh findMatchingFiles "$rdir" "$rpat"`
    
-    exp=`basename "$rdir"`
-    d1=`dirname "$rdir"`
-    d2=`dirname "$d1"`
-    rdate=`basename "$d2"`
-    d3=`dirname "$d2"`
-    rversion=`basename "$d3"`
+    exp=`echo $rdir | awk -F '/' '{print $NF}'`
+    rtune=`echo $rdir | awk -F '/' '{print $(NF-1)}'`
+    rversion=`echo $rdir | awk -F '/' '{print $(NF-2)}'`
+    rdate=`echo $rdir | awk -F '/' '{print $(NF-4)}'`
+    
     echo "exp = $exp" | tee -a $log
-    echo "d1 = $d1" | tee -a $log
-    echo "d2 = $d2" | tee -a $log
+    echo "rtune = $rtune" | tee -a $log
     echo "rdate = $rdate" | tee -a $log
-    echo "d3 = $d3" | tee -a $log
     echo "rversion = $rversion" | tee -a $log
    
     echo "making local input/regression folder if not there yet.." | tee -a $log
     if [ ! -d "input/regre" ]; then
        mkdir input/regre
     fi
-    if [ ! -d "input/regre/$rversion" ]; then
-       mkdir input/regre/$rversion
+    if [ ! -d "input/regre/$rdate" ]; then
+       mkdir input/regre/$rdate
     fi
-    if [ ! -d "input/regre/$rversion/$rdate" ]; then
-       mkdir input/regre/$rversion/$rdate
+    if [ ! -d "input/regre/$rdate/$rversion" ]; then
+       mkdir input/regre/$rdate/$rversion
+    fi
+    if [ ! -d "input/regre/$rdate/$rversion/$rtune" ]; then
+       mkdir input/regre/$rdate/$rversion/$rtune
     fi
 
     echo "running ifdh fetch for regression MC files" | tee -a $log
-    IFDH_DATA_DIR=./input/regre/$rversion/$rdate ifdh fetchSharedFiles $regrelist
+    IFDH_DATA_DIR=./input/regre/$rdate/$rversion/$rtune ifdh fetchSharedFiles $regrelist
 
     echo "Checking contents of local input/regression folder: " | tee -a $log
-    ls -lh input/regre/$rversion/$rdate | tee -a $log
+    ls -lh input/regre/$rdate/$rversion/$rtune | tee -a $log
 
 done # end loop over rtokens in regre
 
 fi # check `regre == "none" `
 
 ### run the command ###
-
-#### DEBUG INFO BEGIN ####
-echo "*** Debug info ***"
-echo "*** start environment dump***"
-env | sort
-echo "*** end environment dump***"
-
-set -x
-#### DEBUG INFO END ####
-
 
 if [ "$debug" == "true" ]
 then
@@ -265,18 +249,17 @@ then
     # $cmd
 else
     # GENIE is pretty chatty, only save errors to log file
-  eval $cmd 1>/dev/null 2>$log
+  $cmd 1>/dev/null 2>$log
 fi
 
 ### check for NaN's in the (output splines) XML files
 ### NOTE: this is essential for dag_1 and dag_3 
 ###       (generation of nu-nucleon and nu-nucleus/isotope splines, respectively)  
-for xml in *gxs*.xml; do
-   [[ ! -e ${xml} ]] && continue || :
-   echo "Checking ${xml}"
-   nans=`grep -i nan ${xml} || :`
+xmls=`ls *gxs*.xml`
+for xml in ${xmls}; do
+   nans=`grep -i nan ${xml}`
    if [ ! -z "$nans" ]; then
-      echo " ATTENTION: nan is detected in ${xml} output file generated by command ${cmd}; ABORT !!! " | tee bad_splines
+      echo " ATTENTION: nan is detected in ${xml} output file generated by command ${cmd}; ABORT !!! "
       exit 81
    fi
 done
@@ -341,5 +324,7 @@ cd ..
 # jobsub_submit -G genie -M --OS=SL6 --resource-provides=usage_model=DEDICATED,OPPORTUNISTIC file://runGENIE.sh -p /grid/fermiapp/genie/builds/genie_R-2_9_0_buildmaster_2015-10-27/ -o /pnfs/genie/scratch/users/goran/ -c "gmkspl -p 12 -t 1000010010 -n 500 -e 500 -o scratch/pgxspl-qel.xml --event-generator-list QE"
 # temporary solution: use SPACE instead of spaces
 # jobsub_submit -G genie -M --OS=SL6 --resource-provides=usage_model=DEDICATED,OPPORTUNISTIC file://runGENIE.sh -p /grid/fermiapp/genie/builds/genie_R-2_9_0_buildmaster_2015-10-27/ -o /pnfs/genie/scratch/users/goran/ -c "gmksplSPACE-pSPACE12SPACE-tSPACE1000010010SPACE-nSPACE500SPACE-eSPACE500SPACE-oSPACEscratch/pgxspl-qel.xmlSPACE--event-generator-listSPACEQE"
+
+trap
 
 exit ${ci_traperror_exit_code}

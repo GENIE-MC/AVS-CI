@@ -72,13 +72,13 @@ data_struct = {
                     }
 }
 
-def fillDAG( jobsub, tag, date, paths, tunes, regretags, regredir ):
+def fillDAG( jobsub, tag, date, paths, main_tune, tunes, regretags, regredir ):
    outputPaths.expand( paths['minerva'], tunes )
-   fillDAG_GHEP( jobsub, tag, paths['xsec_A'], paths['minerva'], tunes )
-   createCmpConfigs( tag, date, paths['minervarep'], tunes, regretags )
-   fillDAG_cmp( jobsub, tag, date, paths['xsec_A'], paths['minerva'], paths['minervarep'], tunes, regretags, regredir )
+   fillDAG_GHEP( jobsub, tag, paths['xsec_A'], paths['minerva'], main_tune, tunes )
+   createCmpConfigs( tag, date, paths['minervarep'], main_tune, tunes, regretags, regredir )
+   fillDAG_cmp( jobsub, tag, date, paths['xsec_A'], paths['minerva'], paths['minervarep'], tunes, regretags, regredir ) # no need to pass in main_tune
 
-def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, tunes ):
+def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 
    if eventFilesExist(out, tunes):
       msg.warning ("MINERvA test ghep files found in " + out + " ... " + msg.BOLD + "skipping minerva:fillDAG_GHEP\n", 1)
@@ -91,6 +91,8 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, tunes ):
 
    # common configuration
    inputxsec = "gxspl-vA-" + tag + ".xml"
+   if not (main_tune is None):
+      inputxsec = main_tune + "-gxspl-vA-" + tag + ".xml"
    options = " -t " + target + " --cross-sections input/" + inputxsec 
    # loop over keys and generate gevgen command
    for key in data_struct.iterkeys():
@@ -99,6 +101,8 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, tunes ):
         opt = options + " -n " + nevents
      else:
         opt = options + " -n 10000 --event-generator-list COH "
+     if not ( main_tune is None):
+        opt = opt + " --tune " + main_tune     
      cmd = "gevgen " + opt + " -p " + data_struct[key]['projectile'] + " -e " + data_struct[key]['energy'] + \
            " -f " + data_struct[key]['flux'] + " -o gntp." + key + "-" + data_struct[key]['releaselabel'] + ".ghep.root"
      logfile = "gevgen_" + key + ".log"
@@ -118,7 +122,7 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, tunes ):
    # done
    jobsub.add ("</parallel>")
 
-def createCmpConfigs( tag, date, reportdir, tunes, regretags ):
+def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredir ):
 
    # start GLOBAL CMP CONFIG
    gcfg = reportdir + "/global-minerva-cfg-" + tag + "_" + date + ".xml"
@@ -140,22 +144,32 @@ def createCmpConfigs( tag, date, reportdir, tunes, regretags ):
       xml = open( xmlfile, 'w' )
       print >>xml, '<?xml version="1.0" encoding="ISO-8859-1"?>'
       print >>xml, '<genie_simulation_outputs>'
-      print >>xml, '\t<model name="GENIE_' + tag + ':default:' + data_struct[key]['releaselabel'] + '">'
+      if (main_tune is None):
+         print >>xml, '\t<model name="GENIE_' + tag + "-" + date + ':default:' + data_struct[key]['releaselabel'] + '">'
+      else:
+         print >>xml, '\t<model name="GENIE_' + tag + "-" + date + ':' + main_tune + ':' + data_struct[key]['releaselabel'] + '">'
       print >>xml, '\t\t<evt_file format="ghep"> input/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
       print >>xml, '\t</model>'
       # tunes if specied
       if not (tunes is None):
          for tn in range(len(tunes)):
-	    print >>xml, '\t<model name="GENIE_' + tag + ':' + tunes[tn] + ':' + data_struct[key]['releaselabel'] + '">'
+	    print >>xml, '\t<model name="GENIE_' + tag + "-" + date + ':' + tunes[tn] + ':' + data_struct[key]['releaselabel'] + '">'
 	    print >>xml, '\t\t<evt_file format="ghep"> input/' + tunes[tn] + '-gntp.' + key + "-" + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
 	    print >>xml, '\t</model>'
       # regression if specified (but not for COH pion since regression files seems corrupted)
       # backward compatibility repaired for COH (and perhaps others); so resume "full" regression  
       # if key.find("CoherentPi") == -1:
       if not (regretags is None):
+         # need to fetch date stamp for the regression from the leading path
+         # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+         # NOTE: redirect output of split(...) to a separate array; 
+         #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+         regredir_tmp = regredir.split("/")
+         rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
          for rt in range(len(regretags)):
-	    print >>xml, '\t<model name="GENIE_' + regretags[rt] + ":default:" + data_struct[key]['releaselabel'] + '">'
-	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
+            rversion, rtune = regretags[rt].split("/") 
+	    print >>xml, '\t<model name="GENIE_' + rversion + '-' + rdate + ':' + rtune + ':' + data_struct[key]['releaselabel'] + '">'
+	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
 	    print >>xml, '\t</model>'
       print >>xml, '</genie_simulation_outputs>'
       xml.close()
@@ -202,7 +216,8 @@ def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, tunes, reg
    if not (regretags is None):
       regre = ""
       for rt in range(len(regretags)):
-         regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
+         # NOTE: no need to fetch rtune because we don't get xsec, otherwise it's part of regretags 
+	 regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
    jobsub.addJob ( inputs, reportdir, logfile, cmd, regre )
    # done
    jobsub.add ("</serial>")

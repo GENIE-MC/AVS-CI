@@ -634,17 +634,17 @@ comparisons = {
 }
 
 
-def fillDAG (jobsub, tag, date, paths, tunes, regretags, regredir ):
+def fillDAG (jobsub, tag, date, paths, main_tune, tunes, regretags, regredir ):
   outputPaths.expand( paths['xsecval'], tunes )
-  fillDAG_GHEP ( jobsub, tag, paths['xsec_A'], paths['xsecval'], tunes )
+  fillDAG_GHEP ( jobsub, tag, paths['xsec_A'], paths['xsecval'], main_tune, tunes )
   # ---> NO need ---> fillDAG_GST ( jobsub, paths['xsecval'] )
-  createFileList (tag, date, paths['xsec_A'], paths['xsecval'], paths['xseclog'], tunes, regretags )
+  createFileList (tag, date, paths['xsec_A'], paths['xsecval'], paths['xseclog'], main_tune, tunes, regretags, regredir )
   # NOTE: no need to deal with tunes and/or regre in createCmpConfig 
   #      since it's all reflected on fileList which is created in createFileList
   createCmpConfig (tag, date, paths['xseclog'] ) 
-  fillDAG_cmp (jobsub, tag, date, paths['xsec_A'], paths['xsecval'], paths['xseclog'], tunes, regretags, regredir ) 
+  fillDAG_cmp (jobsub, tag, date, paths['xsec_A'], paths['xsecval'], paths['xseclog'], main_tune, tunes, regretags, regredir ) 
 
-def fillDAG_GHEP ( jobsub, tag, xsec_a_path, out, tunes ):
+def fillDAG_GHEP ( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
   # check if job is done already
   if isDoneGHEP (out,tunes):
     msg.warning ("xsec validation ghep files found in " + out + " ... " + msg.BOLD + "skipping xsecval:fillDAG_GHEP\n", 1)
@@ -660,6 +660,9 @@ def fillDAG_GHEP ( jobsub, tag, xsec_a_path, out, tunes ):
   inputFile = "gxspl-vA-" + tag + ".xml"
   options   = " -n " + nEvents + " -e " + energy + " -f " + flux + " --seed " + mcseed + \
               " --cross-sections input/" + inputFile + " --event-generator-list " + generatorList
+  if not (main_tune is None):
+     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
+     options = options + " --tune " + main_tune
   # loop over keys and generate gevgen command
   for key in nuPDG.iterkeys():
     cmd = "gevgen " + options + " -p " + nuPDG[key] + " -t " + targetPDG[key] + " -r " + key
@@ -696,7 +699,7 @@ def fillDAG_GST (jobsub, out):
   # done
   jobsub.add ("</parallel>")
 
-def createFileList (tag, date, xsec_a_path, outEvent, outRep, tunes, regretags):
+def createFileList (tag, date, xsec_a_path, outEvent, outRep, main_tune, tunes, regretags, regredir):
   
   # create xml file with the file list in the format as src/scripts/production/misc/make_genie_sim_file_list.pl
   xmlFile = outRep + "/file_list-" + tag + "-" + date + ".xml"
@@ -705,10 +708,16 @@ def createFileList (tag, date, xsec_a_path, outEvent, outRep, tunes, regretags):
   xml = open (xmlFile, 'w');
   print >>xml, '<?xml version="1.0" encoding="ISO-8859-1"?>'
   print >>xml, '<genie_simulation_outputs>'
-  print >>xml, '\t<model name="' + tag + '-' + date + ':default:world' '">'
+  if (main_tune is None):
+     print >>xml, '\t<model name="' + tag + '-' + date + ':default:world' '">'
+  else:
+     print >>xml, '\t<model name="' + tag + '-' + date + ':' + main_tune + ':world' '">'
   for key in nuPDG.iterkeys():
     print >>xml, '\t\t<evt_file format="ghep"> input/gntp.' + key + '.ghep.root </evt_file>'
-  print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
+  if (main_tune is None):
+     print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
+  else:
+     print >>xml, '\t\t<xsec_file> input/' + main_tune + '-xsec-vA-' + tag + '.root </xsec_file>'
   print >>xml, '\t</model>'
   # same for tunes if specified
   if not (tunes is None):
@@ -719,12 +728,19 @@ def createFileList (tag, date, xsec_a_path, outEvent, outRep, tunes, regretags):
         print >>xml, '\t\t<xsec_file> input/' + tunes[tn] + '-xsec-vA-' + tag + '.root </xsec_file>'
         print  >>xml, '\t</model>'  
   if not (regretags is None):
+     # need to fetch date stamp for the regression from the leading path
+     # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+     # NOTE: redirect output of split(...) to a separate array; 
+     #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+     regredir_tmp = regredir.split("/")
+     rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last 
      for rt in range(len(regretags)):
-        rversion, rdate = regretags[rt].split("/") 
-	print >>xml, '\t<model name="' + regretags[rt] + ':default:world' '">'
+        rversion, rtune = regretags[rt].split("/") 
+	# print >>xml, '\t<model name="' + regretags[rt] + ':default:world' '">'
+	print >>xml, '\t<model name="' + rversion + "-" + rdate + ':' + rtune + ':world' '">'
         for key in nuPDG.iterkeys():
-           print >>xml, '\t\t<evt_file format="ghep"> input/regre/' +  regretags[rt] +'/gntp.' + key + '.ghep.root </evt_file>'
-        print >>xml, '\t\t<xsec_file> input/regre/'  + regretags[rt] + '/xsec-vA-' + rversion + '.root </xsec_file>'
+           print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] +'/gntp.' + key + '.ghep.root </evt_file>'
+	print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
         print >>xml, '\t</model>'
   print >>xml, '</genie_simulation_outputs>'
   xml.close()
@@ -760,7 +776,7 @@ def createCmpConfig( tag, date, reportdir ):
       print >>gxml, '</config>'
       gxml.close()
       
-def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, tunes, regretags, regredir):
+def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, main_tune, tunes, regretags, regredir):
   # check if job is done already
   if isDoneData (tag, date, outRep):
     msg.warning ("xsec validation plots found in " + outRep + " ... " + msg.BOLD + "skipping xsecval:fillDAG_data\n", 1)
@@ -770,6 +786,8 @@ def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, tunes, regre
   msg.info ("\tAdding xsec validation (data) jobs\n")    
 
   inputs = outRep + "/*.xml " + xsec_a_path + "/xsec-vA-" + tag + ".root " + outEvents + "/*.ghep.root "
+  if not (main_tune is None):
+     inputs = outRep + "/*.xml " + xsec_a_path + "/" + main_tune +"-xsec-vA-" + tag + ".root " + outEvents + "/*.ghep.root "
   if not ( tunes is None):
      for tn in range(len(tunes)):
         inputs = inputs + " " + xsec_a_path + "/" + tunes[tn] + "/" + tunes[tn] + "-xsec-vA-" + tag + ".root " + \
@@ -778,9 +796,10 @@ def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, tunes, regre
   regre = None
   if not (regretags is None):
      regre = ""
+     # NOTE: no need to fetch rdate here; it'll just be part of regre_dir "leading" path
      for rt in range(len(regretags)):
-        rversion, rdate = regretags[rt].split("/")
-	regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/xsec-vA-" + rversion + ".root " 
+        rversion, rtune = regretags[rt].split("/")
+	regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
 	regre = regre + regredir + "/" + regretags[rt] + "/events/xsec_validation/*.ghep.root " 
 
   # in parallel mode

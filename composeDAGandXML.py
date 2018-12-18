@@ -25,7 +25,7 @@ import os, datetime
 #  optional:               [ --regre R-2_12_6/2017-09-11,RegTag2,RegTag3,... --regre_dir /pnfs/genie/persistent/users/yarba_j/GENIE_LegacyValidation ]
 #
 # OLD FORMAT !!! 
-#  optional:               [ --tunes 'tune1 tune2 ...' ]
+#  optional:               [ --add_tunes 'tune1 tune2 ...' ]
 #  optional:               [ --regre 'R-2_12_6/2017-09-11 [reg2 reg3...]' --regre_dir /pnfs/genie/persistent/users/yarba_j/GENIE_LegacyValidation ]
 
 def initMessage (args):
@@ -59,11 +59,18 @@ if __name__ == "__main__":
      #
      args.build_date = datetime.date.today().strftime("%Y-%m-%d") 
   
+  
+  if args.main_tune is None:
+     args.main_tune = "Default"
+  
   # print configuration summary
   initMessage (args)
 
   # preapre folder(s) structure for output
-  args.paths = outputPaths.prepare ( args.output + "/" + args.tag + "/" + args.build_date )
+  # 12/12/2018 - remove build_date from the path; it'll be embeded by the CI machinery
+  #              instead, use (main_)tune
+#  args.paths = outputPaths.prepare ( args.output + "/" + args.tag + "/" + args.build_date )
+  args.paths = outputPaths.prepare ( args.output + "/" + args.tag + "/" + args.main_tune )
 
   # initialize jobsub 
   #
@@ -75,12 +82,37 @@ if __name__ == "__main__":
   args.buildNameCmp = "comparisons_" + args.cmptag + "_" + args.build_date
 
   # tune(s) (optional)
-  if not (args.tunes is None):
-     args.tunes = args.tunes.split(",")
+  if not (args.add_tunes is None):
+     args.add_tunes = args.add_tunes.split(",")
+     # weed out additional tune thaat's the same as main_tune (if any)
+     add_tunes_tmp = []
+     for tn in range(len(args.add_tunes)):
+        if ( args.add_tunes[tn].find(args.main_tune) == -1 ):
+	   add_tunes_tmp.append( args.add_tunes[tn] )
+     if not add_tunes_tmp:
+        print msg.RED
+	print "\tNo additional tune(s) that are different from main_tune " + args.main_tune + "; set additional tunes to None"
+	print mas.END
+	args.add_tunes = None
+     else:
+        args.add_tunes = add_tunes_tmp
   
   # regresion tests (optional)
   if not (args.regretags is None):
      args.regretags = args.regretags.split(",")
+     regretags_tmp = []
+     # here we also have to select only those that match the main_tune
+     for rt in range(len(args.regretags)):
+	if ( args.regretags[rt].find("/"+args.main_tune) != -1 ):
+	   regretags_tmp.append(args.regretags[rt])  # to remove, use pop[rt]  	
+     if not regretags_tmp:
+        print msg.RED
+        print "\tNo tags in the regression list match main_tune " + args.main_tune + "; set regression to None"
+        print msg.END
+	args.regretags = None
+     else:
+        args.regretags = regretags_tmp
+     #
      # also need to check/assert that args.regredir is not None !!! otherwise throw !!!
      # assert ( not (args.regredir is None) ), "Path to regression dir is required for regression tests"
      if args.regredir is None: raise AssertionError
@@ -90,20 +122,20 @@ if __name__ == "__main__":
   # fill dag files with jobs
   msg.info ("Adding jobs to dag file: " + jobsub.dagFile + "\n")
   # nucleon cross sections
-  nun.fillDAG ( jobsub, args.tag, args.paths, args.tunes )
+  nun.fillDAG ( jobsub, args.tag, args.paths, args.main_tune, args.add_tunes )
   # nucleus cross sections
-  nua.fillDAG ( jobsub, args.tag, args.paths, args.tunes )
+  nua.fillDAG ( jobsub, args.tag, args.paths, args.main_tune, args.add_tunes )
   # standard mc sanity check (events scan)
-  standard.fillDAG( jobsub, args.tag, args.paths ) # NO TUNES assumed so far !!!
+  standard.fillDAG( jobsub, args.tag, args.paths, args.main_tune ) # NO ADDITIONAL TUNES assumed !!!
   # xsec validation
-  xsecval.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.tunes, args.regretags, args.regredir ) 
+  xsecval.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir ) 
   # hadronization test
-  hadronization.fillDAG ( jobsub, args.tag, args.build_date, args.paths, args.tunes, args.regretags, args.regredir )
+  hadronization.fillDAG ( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
   # MINERvA test
-  minerva.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.tunes, args.regretags, args.regredir )
+  minerva.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
   # T2K
   # NOTE (JVY): NO regression test so far since we don't have anything for T2k from GENIE v2_x_y
-  t2k.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.tunes, None, None )
+  t2k.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, None, None )
   # MiniBooNE
   # NOTE (JVY): NO regression test so far since we don't have anything for MiniBooNE from GENIE v2_x_y
-  miniboone.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.tunes, None, None )
+  miniboone.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, None, None )

@@ -140,12 +140,12 @@ outXML = {'chm'           : 'pgxspl-chm.xml',
           'res_tau_cc'    : 'pgxspl-res_tau_cc.xml',
           'res_tau_nc'    : 'pgxspl-res_tau_nc.xml'}
 
-def fillDAG (jobsub, tag, paths, tunes):
+def fillDAG (jobsub, tag, paths, main_tune, tunes):
   outputPaths.expand( paths['xsec_N'], tunes )
-  fillDAGPart (jobsub, tag, paths['xsec_N'], tunes)
-  fillDAGMerge (jobsub, tag, paths['xsec_N'], tunes)
+  fillDAGPart (jobsub, tag, paths['xsec_N'], main_tune, tunes)
+  fillDAGMerge (jobsub, tag, paths['xsec_N'], main_tune, tunes)
 
-def fillDAGPart (jobsub, tag, out, tunes):
+def fillDAGPart (jobsub, tag, out, main_tune, tunes):
   # check if job is done already
   if isDonePart (out,tunes):
     msg.warning ("Nucleons splines found in " + out + " ... " + msg.BOLD + "skipping nun:fillDAGPart\n", 1)
@@ -177,6 +177,8 @@ def fillDAGPart (jobsub, tag, out, tunes):
   for key in data_struct.iterkeys():
      cmd = "gmkspl -p " + data_struct[key]['projectile'] + " -t " + data_struct[key]['target'] \
          + " -n " + nKnots + " -e " + maxEnergy + " -o " + data_struct[key]['output']
+     if not (main_tune is None):
+        cmd = cmd + " --tune " + main_tune
      logFile = "gmkspl." + key + ".log"
      jobsub.addJob( inputs, out, logFile, cmd, None )
      if not (tunes is None):
@@ -189,9 +191,9 @@ def fillDAGPart (jobsub, tag, out, tunes):
   # done
   jobsub.add ("</parallel>")
   
-def fillDAGMerge (jobsub, tag, out, tunes): 
+def fillDAGMerge (jobsub, tag, out, main_tune, tunes): 
   # check if job is done already
-  if isDoneMerge (tag, out, tunes):
+  if isDoneMerge (tag, out, main_tune, tunes):
     msg.warning ("Nucleons merged splines found in " + out + " ... " + msg.BOLD + "skipping nun:fillDAGMerge\n", 1)
     return
   # not done, add jobs to dag
@@ -201,7 +203,9 @@ def fillDAGMerge (jobsub, tag, out, tunes):
   jobsub.add ("<serial>")
 
   # common options
-  xmlFile = "gxspl-vN-" + tag + ".xml"  
+  xmlFile = "gxspl-vN-" + tag + ".xml" 
+  if not (main_tune is None):
+     xmlFile = main_tune + "-gxspl-vN-" + tag + ".xml" 
   # merge splines job
   cmd = "gspladd -d input -o " + xmlFile
   inputs = out + "/pgxspl*.xml"
@@ -209,6 +213,8 @@ def fillDAGMerge (jobsub, tag, out, tunes):
   jobsub.addJob (inputs, out, logFile, cmd, None)
   # convert to root job
   rootFile = "xsec-vN-" + tag + ".root"
+  if not (main_tune is None):
+     rootFile = main_tune + "-xsec-vN-" + tag + ".root"
   cmd = "gspl2root -p 12,-12,14,-14,16,-16 -t 1000010010,1000000010 -o " + rootFile + " -f input/" + xmlFile
   inputs = out + "/" + xmlFile
   logFile = "gspl2root.log"
@@ -238,9 +244,14 @@ def isDonePart (path,tunes):
     
   return True
     
-def isDoneMerge (tag, path, tunes):
-  if "gxspl-vN-" + tag + ".xml" not in os.listdir (path): return False
-  if "xsec-vN-" + tag + ".root" not in os.listdir (path): return False
+def isDoneMerge (tag, path, main_tune, tunes):
+  
+  if main_tune is None:
+     if "gxspl-vN-" + tag + ".xml" not in os.listdir (path): return False
+     if "xsec-vN-" + tag + ".root" not in os.listdir (path): return False
+  else:
+     if main_tune + "-gxspl-vN-" + tag + ".xml" not in os.listdir (path): return False
+     if main_tune + "-xsec-vN-" + tag + ".root" not in os.listdir (path): return False
   
   if not (tunes is None):
      for tn in range(len(tunes)):

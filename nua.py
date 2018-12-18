@@ -23,12 +23,12 @@ targets = ['1000010010',  # H1
            '1000260560'   # Fe56
           ];
           
-def fillDAG (jobsub, tag, paths, tunes):
+def fillDAG (jobsub, tag, paths, main_tune, tunes):
   outputPaths.expand( paths['xsec_A'], tunes )
-  fillDAGPart (jobsub, tag, paths['xsec_N'], paths['xsec_A'], tunes)
-  fillDAGMerge (jobsub, tag, paths['xsec_A'], tunes)
+  fillDAGPart (jobsub, tag, paths['xsec_N'], paths['xsec_A'], main_tune, tunes)
+  fillDAGMerge (jobsub, tag, paths['xsec_A'], main_tune, tunes)
   
-def fillDAGPart (jobsub, tag, xsec_n_path, out, tunes):
+def fillDAGPart (jobsub, tag, xsec_n_path, out, main_tune, tunes):
   # check if job is done already
   if isDonePart (tag, out, tunes):
     msg.warning ("Nucleus splines found in " + out + " ... " + msg.BOLD + "skipping nua:fillDAGPart\n", 1)
@@ -41,6 +41,8 @@ def fillDAGPart (jobsub, tag, xsec_n_path, out, tunes):
 
   # common options
   inputFile = "gxspl-vN-" + tag + ".xml"
+  if not (main_tune is None):
+     inputFile = main_tune + "-gxspl-vN-" + tag + ".xml"   
   inputs = xsec_n_path + "/" + inputFile
   options = " --input-cross-sections input/" + inputFile
   # loop over nuPDG's and targets and generate proper command
@@ -49,6 +51,8 @@ def fillDAGPart (jobsub, tag, xsec_n_path, out, tunes):
     outputFile = "gxspl_" + nu + "_" + t + ".xml"
     cmd = "gmkspl -p " + nu + " -t " + t + " -n " + nKnots + " -e " + maxEnergy + options + \
           " --output-cross-sections " + outputFile
+    if not (main_tune is None):
+       cmd = cmd + " --tune " + main_tune
     logFile = "gxspl_" + nu + "_" + t + ".xml.log"
     jobsub.addJob (inputs, out, logFile, cmd, None)
     # same for tunes if specified
@@ -64,9 +68,9 @@ def fillDAGPart (jobsub, tag, xsec_n_path, out, tunes):
   # done
   jobsub.add ("</parallel>")
   
-def fillDAGMerge (jobsub, tag, out, tunes):
+def fillDAGMerge (jobsub, tag, out, main_tune, tunes):
   # check if job is done already
-  if isDoneMerge (tag, out, tunes):
+  if isDoneMerge (tag, out, main_tune, tunes):
     msg.warning ("Nucleus merged splines found in " + out + " ... " + msg.BOLD + "skipping nua:fillDAGMerge\n", 1)
     return
   # not done, add jobs to dag
@@ -77,6 +81,8 @@ def fillDAGMerge (jobsub, tag, out, tunes):
 
   # common options
   xmlFile = "gxspl-vA-" + tag + ".xml"
+  if not (main_tune is None):
+     xmlFile = main_tune + "-gxspl-vA-" + tag + ".xml" 
   # merge splines job
   cmd = "gspladd -d input -o " + xmlFile
   inputs = out + "/gxspl*.xml"
@@ -84,6 +90,8 @@ def fillDAGMerge (jobsub, tag, out, tunes):
   jobsub.addJob (inputs, out, logFile, cmd, None)
   # convert to root job
   rootFile = "xsec-vA-" + tag + ".root"
+  if not (main_tune is None):
+     rootFile = main_tune + "-xsec-vA-" + tag + ".root"
   cmd = "gspl2root -p " + ",".join(nuPDG) + " -t " + ",".join(targets) + " -o " + rootFile + " -f input/" + xmlFile
   inputs = out + "/" + xmlFile
   logFile = "gspl2root.log"
@@ -115,10 +123,15 @@ def isDonePart (tag, path, tunes):
   
   return True
 
-def isDoneMerge (tag, path, tunes):
+def isDoneMerge (tag, path, main_tune, tunes):
 
-  if "gxspl-vA-" + tag + ".xml" not in os.listdir (path): return False
-  if "xsec-vA-" + tag + ".root" not in os.listdir (path): return False
+  if main_tune is None:
+     if "gxspl-vA-" + tag + ".xml" not in os.listdir (path): return False
+     if "xsec-vA-" + tag + ".root" not in os.listdir (path): return False
+  else:
+     if main_tune + "-gxspl-vA-" + tag + ".xml" not in os.listdir (path): return False
+     if main_tune + "-xsec-vA-" + tag + ".root" not in os.listdir (path): return False
+  
 
   if not (tunes is None):
      for tn in range(len(tunes)):
