@@ -658,11 +658,14 @@ def fillDAG_GHEP ( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 
   # common configuration
   inputFile = "gxspl-vA-" + tag + ".xml"
+  if not (main_tune is None):
+     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
+
   options   = " -n " + nEvents + " -e " + energy + " -f " + flux + " --seed " + mcseed + \
               " --cross-sections input/" + inputFile + " --event-generator-list " + generatorList
   if not (main_tune is None):
-     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
      options = options + " --tune " + main_tune
+
   # loop over keys and generate gevgen command
   for key in nuPDG.iterkeys():
     cmd = "gevgen " + options + " -p " + nuPDG[key] + " -t " + targetPDG[key] + " -r " + key

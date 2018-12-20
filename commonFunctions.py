@@ -18,9 +18,11 @@ def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, main_tune, t
 
    # common configuration
    inputxsec = "gxspl-vA-" + tag + ".xml"
-   options = " -t " + meta['target'] + " --cross-sections input/" + inputxsec 
    if not (main_tune is None):
       inputxsec = main_tune + "-gxspl-vA-" + tag + ".xml"
+
+   options = " -t " + meta['target'] + " --cross-sections input/" + inputxsec 
+   if not (main_tune is None):
       options = options + " --tune " + main_tune
 
    for key in data_struct.iterkeys():
