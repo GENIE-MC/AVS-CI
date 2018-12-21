@@ -43,7 +43,7 @@ def fillDAG_GHEP (jobsub, tag, xsec_n_path, out, main_tune, tunes):
   # common configuration
   inputFile = "gxspl-vN-" + tag + ".xml"
   if not (main_tune is None):
-     inputFile = main_tune + "-gxspl-vA-" + tag + ".xml"
+     inputFile = main_tune + "-gxspl-vN-" + tag + ".xml"
 
   options   = " -n " + nEvents + " -e " + energy + " -f " + flux + " --seed " + mcseed + \
               " --cross-sections input/" + inputFile + " --event-generator-list " + generatorList
