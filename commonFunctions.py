@@ -81,7 +81,7 @@ def createCmpConfigs( meta, data_struct, tag, date, reportdir, main_tune, tunes,
       if ( main_tune is None):
          print >>xml, '\t<model name="' + tag + '-' + date + ':default:' + data_struct[key]['releaselabel'] + '">'
       else:
-         print >>xml, '\t<model name="' + tag + '-' + date + ':' + main_tune + data_struct[key]['releaselabel'] + '">'
+         print >>xml, '\t<model name="' + tag + '-' + date + ':' + main_tune + ':' + data_struct[key]['releaselabel'] + '">'
       print >>xml, '\t\t<evt_file format="ghep"> input/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
       if ( main_tune is None):
          print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
