@@ -206,9 +206,9 @@ do
     regrelist=`ifdh findMatchingFiles "$rdir" "$rpat"`
    
     exp=`echo $rdir | awk -F '/' '{print $NF}'`
-    rtune=`echo $rdir | awk -F '/' '{print $(NF-1)}'`
-    rversion=`echo $rdir | awk -F '/' '{print $(NF-2)}'`
-    rdate=`echo $rdir | awk -F '/' '{print $(NF-4)}'`
+    rtune=`echo $rdir | awk -F '/' '{print $(NF-2)}'`
+    rversion=`echo $rdir | awk -F '/' '{print $(NF-3)}'`
+    rdate=`echo $rdir | awk -F '/' '{print $(NF-5)}'`
     
     echo "exp = $exp" | tee -a $log
     echo "rtune = $rtune" | tee -a $log
