@@ -16,17 +16,20 @@ import xsecval, minerva, t2k, miniboone
 import os, datetime
 
 # example format:
-# ./composeDAGandXML.py --genie_tag trunk  \ 
+# ./composeDAGandXML.py --genie_tag master  \ 
 #                          --build_date YYYY-MM-DD  \
 #                          --run_path /path/to/runGENIE.sh \ # e.g. /grid/fermiapp/genie/legacyValidation_update_1/runGENIE.sh
 #                          --builds DUMMY \ 
 #                          --output OUTPUT \ # e.g. /pnfs/genie/scratch/users/yarba_j/GENIE_LegacyValidation 
+#  optional:               [ --main_tune the_tune ]
+#  optional:               [ --add_tunes tune1,tune2,...]  # comma-separated !!!
+#  optional:               [ --regre Revision/Tune,RegTag2,RegTag3,... --regre_dir /pnfs/genie/persistent/users/yarba_j/GENIE_LegacyValidation/Root<5/6>TimeStamp/Index ]
+#                    e.g.    --regre R-2_12_10/Default --regre_dir /pnfs/genie/persistent/users/geniepro/GENIE_CI_Validation/Root5/2018-02-07/00 
+#
+# OLD FORMAT
 #  optional:               [ --tunes tune1,tune2,...]  # comma-separated !!!
 #  optional:               [ --regre R-2_12_6/2017-09-11,RegTag2,RegTag3,... --regre_dir /pnfs/genie/persistent/users/yarba_j/GENIE_LegacyValidation ]
 #
-# OLD FORMAT !!! 
-#  optional:               [ --add_tunes 'tune1 tune2 ...' ]
-#  optional:               [ --regre 'R-2_12_6/2017-09-11 [reg2 reg3...]' --regre_dir /pnfs/genie/persistent/users/yarba_j/GENIE_LegacyValidation ]
 
 def initMessage (args):
   print msg.BLUE

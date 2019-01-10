@@ -216,6 +216,8 @@ def fillDAGMerge (jobsub, tag, out, main_tune, tunes):
   if not (main_tune is None):
      rootFile = main_tune + "-xsec-vN-" + tag + ".root"
   cmd = "gspl2root -p 12,-12,14,-14,16,-16 -t 1000010010,1000000010 -o " + rootFile + " -f input/" + xmlFile
+  if not (main_tune is None):
+     cmd = cmd + " --tune " + main_tune
   inputs = out + "/" + xmlFile
   logFile = "gspl2root.log"
   jobsub.addJob (inputs, out, logFile, cmd, None)
