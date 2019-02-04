@@ -811,7 +811,10 @@ def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, main_tune, t
     inFile = comp + "-" + tag + "-" + date + ".xml"    
     outFile = "genie_" + tag + "_" + comparisons[comp]['outprefix'] + comp 
     tablechi2 = "genie_" + tag + "_" + comparisons[comp]['outprefix'] + comp  + "-summary-chi2.txt"
-    cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile + " --summary-chi2-table " + tablechi2
+    tableks = "genie_" + tag + "_" + comparisons[comp]['outprefix'] + comp  + "-summary-KS.txt"
+    cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile 
+    cmd = cmd + " --summary-chi2-table " + tablechi2
+    cmd = cmd + " --summary-KS-table " + tableks
     logFile = "gvld_nu_xsec_" + comp + ".log"
     jobsub.addJob (inputs, outRep, logFile, cmd, regre)
 

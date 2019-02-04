@@ -146,7 +146,10 @@ def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, re
       inFile = "cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"
       outFile = "genie_" + tag + "_" + data_struct[key]['releaselabel']
       tablechi2 = "genie_" + tag + "_" + data_struct[key]['releaselabel'] + "-summary-chi2.txt"
-      cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile + " --summary-chi2-table " + tablechi2
+      tableks = "genie_" + tag + "_" + data_struct[key]['releaselabel'] + "-summary-KS.txt"
+      cmd = "gvld_general_comparison --no-root-output --global-config input/" + inFile + " -o " + outFile 
+      cmd = cmd + " --summary-chi2-table " + tablechi2
+      cmd = cmd + " --summary-KS-table " + tableks
       logfile = data_struct[key]['releaselabel'] + ".log"
       jobsub.addJob ( inputs, reportdir, logfile, cmd, regre )
 
