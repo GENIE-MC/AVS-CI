@@ -3,6 +3,8 @@
 import msg
 import outputPaths
 import os
+import commands
+import commonFunctions
 
 nuPDG = {
   '1000' :  '14',
@@ -115,12 +117,19 @@ def fillDAG_data (jobsub, tag, date, xsec_n_path, outEvents, outRep, main_tune, 
   logFile = "gvld_hadronz_test.log"
   regre = None
   if not (regretags is None):
-     # NOTE: no need to fetch rdate here; it'll just be part of regre_dir "leading" path
-     regre = ""
-     for rt in range(len(regretags)):
-        rversion, rtune = regretags[rt].split("/")
-	regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuN/"+ rtune + "-xsec-vN-" + rversion + ".root " 
-	regre = regre + regredir + "/" + regretags[rt] + "/events/hadronization/*.ghep.root " 
+     # check if input for regression is OK
+     regreOK = commonFunctions.regreInputOK( "hadronization", regretags, regredir, len(nuPDG), "vN", "/xsec/nuN/" )
+     if regreOK:
+        # NOTE: no need to fetch rdate here; it'll just be part of regre_dir "leading" path
+        regre = ""
+        for rt in range(len(regretags)):
+           rversion, rtune = regretags[rt].split("/")
+	   regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuN/"+ rtune + "-xsec-vN-" + rversion + ".root " 
+	   regre = regre + regredir + "/" + regretags[rt] + "/events/hadronization/*.ghep.root "
+     else:
+        msg.info( "\t\tNO input for regression will be copied over \n" )
+	regre = None
+
   jobsub.addJob ( inputs, outRep, logFile, cmd, regre )
 
   # done
@@ -152,6 +161,9 @@ def isDoneData (tag, date, path):
   return True
   
 def createFileList ( tag, date, xsec_n_path, outEvent, outRep, main_tune, tunes, regretags, regredir ):
+
+  msg.info ("\tCreate configuration XML for hadronization test \n")
+
   # create xml file with the file list in the format as src/scripts/production/misc/make_genie_sim_file_list.pl
   xmlFile = outRep + "/file_list-" + tag + "-" + date + ".xml"
   try: os.remove (xmlFile)
@@ -180,20 +192,26 @@ def createFileList ( tag, date, xsec_n_path, outEvent, outRep, main_tune, tunes,
 	print  >>xml, '\t</model>'
   # regression if specified
   if not (regretags is None):
-     # need to fetch date stamp for the regression from the leading path
-     # assume that regredir is always /leading/path/to/TIMESTAMP/Index
-     # NOTE: redirect output of split(...) to a separate array; 
-     #       otherwise len(...) will be the length of regredir, not the length of array after splitting
-     regredir_tmp = regredir.split("/")
-     rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
-     for rt in range(len(regretags)):
-	rversion, rtune = regretags[rt].split("/")
-	# print >>xml, '\t<model name="' + regretags[rt] + '">'
-	print >>xml, '\t<model name="' + rtune + '-' + rversion + '-' + rdate +  '">'     
-	for key in nuPDG.iterkeys():
-           print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '.ghep.root </evt_file>'
-        print  >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vN-' + rversion + '.root </xsec_file>'
-	print  >>xml, '\t</model>'
+     # check if input for regression is OK
+     regreOK = commonFunctions.regreInputOK( "hadronization", regretags, regredir, len(nuPDG), "vN", "/xsec/nuN/" )
+     if regreOK:
+        # need to fetch date stamp for the regression from the leading path
+        # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+        # NOTE: redirect output of split(...) to a separate array; 
+        #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+        regredir_tmp = regredir.split("/")
+        rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
+        for rt in range(len(regretags)):
+	   rversion, rtune = regretags[rt].split("/")
+	   # print >>xml, '\t<model name="' + regretags[rt] + '">'
+	   print >>xml, '\t<model name="' + rtune + '-' + rversion + '-' + rdate +  '">'     
+	   for key in nuPDG.iterkeys():
+              print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '.ghep.root </evt_file>'
+           print  >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vN-' + rversion + '.root </xsec_file>'
+	   print  >>xml, '\t</model>'
+     else:
+        msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )
+  
   print >>xml, '</genie_simulation_outputs>'
   xml.close()
 

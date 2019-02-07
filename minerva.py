@@ -3,6 +3,7 @@
 import msg
 import outputPaths
 import os
+import commonFunctions
 
 
 # Hydrocarbon1000010010[0.077418],1000060120[0.922582]
@@ -124,6 +125,8 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 
 def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredir ):
 
+   msg.info( "\tCreate configuration XML for MINERvA test \n" ) 
+   
    # start GLOBAL CMP CONFIG
    gcfg = reportdir + "/global-minerva-cfg-" + tag + "_" + date + ".xml"
    try: os.remove(gcfg)
@@ -133,7 +136,9 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
    print >>gxml, '<config>'
    print >>gxml, '\t<experiment name="MINERvA">'
    print >>gxml, '\t\t<paths_relative_to_geniecmp_topdir> false </paths_relative_to_geniecmp_topdir>'
-
+   
+   regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+   
    # in the loop, create GSim cfg files and also put their names in the global cfg
    for key in data_struct.iterkeys():
       gsimfile = "/gsimfile-" + tag + "-" + date + "-minerva-" + key + ".xml"
@@ -159,8 +164,9 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
       # regression if specified (but not for COH pion since regression files seems corrupted)
       # backward compatibility repaired for COH (and perhaps others); so resume "full" regression  
       # if key.find("CoherentPi") == -1:
-      if not (regretags is None):
-         # need to fetch date stamp for the regression from the leading path
+      # --> if not (regretags is None):
+      if regreOK:         
+	 # need to fetch date stamp for the regression from the leading path
          # assume that regredir is always /leading/path/to/TIMESTAMP/Index
          # NOTE: redirect output of split(...) to a separate array; 
          #       otherwise len(...) will be the length of regredir, not the length of array after splitting
@@ -171,6 +177,9 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
 	    print >>xml, '\t<model name="GENIE_' + rversion + '-' + rdate + ':' + rtune + ':' + data_struct[key]['releaselabel'] + '">'
 	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
 	    print >>xml, '\t</model>'
+      else:
+         msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )     
+      
       print >>xml, '</genie_simulation_outputs>'
       xml.close()
 
@@ -211,17 +220,27 @@ def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, tunes, reg
    cmd = cmd + " --summary-KS-table " + tableks
    # add the command to dag
    inputs = reportdir + "/*.xml " + eventdir + "/*.ghep.root "
+   
    if not (tunes is None):
       for tn in range(len(tunes)):
          inputs = " " + inputs + eventdir + "/" + tunes[tn] + "/*.ghep.root " 
+   
    logfile = "gvld_general_comparison.log"
+   
    regre = None
    if not (regretags is None):
-      regre = ""
-      for rt in range(len(regretags)):
-         # NOTE: no need to fetch rtune because we don't get xsec, otherwise it's part of regretags 
-	 regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
+      regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+      if regreOK:
+         regre = ""
+         for rt in range(len(regretags)):
+            # NOTE: no need to fetch rtune because we don't get xsec, otherwise it's part of regretags 
+	    regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
+      else:
+         msg.info( "\t\tNO input for regression will be copied over \n" )
+	 regre = None
+   
    jobsub.addJob ( inputs, reportdir, logfile, cmd, regre )
+   
    # done
    jobsub.add ("</serial>")
 

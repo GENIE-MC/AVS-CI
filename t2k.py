@@ -36,6 +36,6 @@ data_struct = {
 def fillDAG( jobsub, tag, date, paths, main_tune, tunes, regretags, regredir ):
    outputPaths.expand( paths['t2k'], tunes )
    commonFunctions.fillDAG_GHEP( meta, data_struct, jobsub, tag, paths['xsec_A'], paths['t2k'], main_tune, tunes )
-   commonFunctions.createCmpConfigs( meta, data_struct, tag, date, paths['t2krep'], main_tune, tunes, regretags )
+   commonFunctions.createCmpConfigs( meta, data_struct, tag, date, paths['t2krep'], main_tune, tunes, regretags, regredir )
    commonFunctions.fillDAG_cmp( meta, data_struct, jobsub, tag, date, paths['xsec_A'], paths['t2k'], paths['t2krep'], main_tune, tunes, regretags, regredir )
 

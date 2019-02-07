@@ -1,6 +1,7 @@
 
 import msg
 import os
+import commands
 
 # this is general enough to put in here 
 nevents="100000"
@@ -43,7 +44,17 @@ def fillDAG_GHEP( meta, data_struct, jobsub, tag, xsec_a_path, out, main_tune, t
    # done
    jobsub.add ("</parallel>")
  
-def createCmpConfigs( meta, data_struct, tag, date, reportdir, main_tune, tunes, regretags ):
+def createCmpConfigs( meta, data_struct, tag, date, reportdir, main_tune, tunes, regretags, regredir ):
+
+   # not done, add jobs to dag
+   msg.info ("\tCreate configuration XML for " + meta['Experiment'] + " test\n")  
+
+   # NOTE: it's not very nice that "vA" and "/xsec/nuA/" are hardcoded here...
+   #       should fine a way to make more configurable, such that this kind
+   #       of info/specs stays on the app side only...
+   #
+   bname = os.path.basename( reportdir )
+   regreOK = regreInputOK( bname, regretags, regredir, len(data_struct), "vA", "/xsec/nuA/" )
 
    for key in data_struct.iterkeys():
       gcfg = reportdir + "/cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"
@@ -97,19 +108,23 @@ def createCmpConfigs( meta, data_struct, tag, date, reportdir, main_tune, tunes,
 	    print >>xml, '\t</model>'
       # regression if specified
       if not (regretags is None):
-         # need to fetch date stamp for the regression from the leading path
-         # assume that regredir is always /leading/path/to/TIMESTAMP/Index
-         # NOTE: redirect output of split(...) to a separate array; 
-         #       otherwise len(...) will be the length of regredir, not the length of array after splitting
-         regredir_tmp = regredir.split("/")
-         rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
-         for rt in range(len(regretags)):
-	    rversion, rtune = regretags[rt].split("/")
-	    # print >>xml, '\t<model name="' + regretags[rt] + ":default:" + data_struct[key]['releaselabel'] + '">'
-	    print >>xml, '\t<model name="' + rversion + '-' + rdate + ':' + rtune + ':' +  data_struct[key]['releaselabel'] + '">'
-	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
-            print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
-	    print >>xml, '\t</model>'
+         if regreOK:
+            # need to fetch date stamp for the regression from the leading path
+            # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+            # NOTE: redirect output of split(...) to a separate array; 
+            #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+            regredir_tmp = regredir.split("/")
+            rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
+            for rt in range(len(regretags)):
+	       rversion, rtune = regretags[rt].split("/")
+	       # print >>xml, '\t<model name="' + regretags[rt] + ":default:" + data_struct[key]['releaselabel'] + '">'
+	       print >>xml, '\t<model name="' + rversion + '-' + rdate + ':' + rtune + ':' +  data_struct[key]['releaselabel'] + '">'
+	       print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + "/" + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
+               print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
+	       print >>xml, '\t</model>'
+         else:
+            msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )     
+	 
       print >>xml, '</genie_simulation_outputs>'
       xml.close()   
 
@@ -135,12 +150,22 @@ def fillDAG_cmp( meta, data_struct, jobsub, tag, date, xsec_a_path, eventdir, re
 	           + eventdir + "/" + tunes[tn] + "/*.ghep.root "
    regre = None
    if not (regretags is None):
-      regre = ""
-      for rt in range(len(regretags)):
-         bname = os.path.basename( eventdir )
-         rversion, rtune = regretags[rt].split("/")
-	 regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
-         regre = regre + regredir + "/" + regretags[rt] + "/events/" + bname + "/*.ghep.root "
+      # NOTE: it's not very nice that "vA" and "/xsec/nuA/" are hardcoded here...
+      #       should fine a way to make more configurable, such that this kind
+      #       of info/specs stays on the app side only...
+      #       in principle, "/xsec/nuA/" can be decoded from xsec_a_path...
+      #
+      bname = os.path.basename( eventdir )
+      regreOK = regreInputOK( bname, regretags, regredir, len(data_struct), "vA", "/xsec/nuA/" )
+      if regreOK:
+         regre = ""
+         for rt in range(len(regretags)):
+            rversion, rtune = regretags[rt].split("/")
+	    regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
+            regre = regre + regredir + "/" + regretags[rt] + "/events/" + bname + "/*.ghep.root "
+      else:
+         msg.info( "\t\tNO input for regression will be copied over \n" )
+	 regre = None
 
    for key in data_struct.iterkeys():
       inFile = "cmp-" + data_struct[key]['releaselabel'] + "-" + tag + "_" + date + ".xml"
@@ -174,3 +199,32 @@ def resultsExist( data_struct, tag, date, path ):
       if outFile not in os.listdir (path): return False
    
    return True
+
+def regreInputOK( cmp_app, regretags, regredir, nreqfiles, xsec_id, xsec_subpath ):
+
+  if not (regretags is None):
+
+     # need to fetch date stamp for the regression from the leading path
+     # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+     # NOTE: redirect output of split(...) to a separate array; 
+     #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+     regredir_tmp = regredir.split("/")
+     rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
+
+     regre_xsec_exists = True
+     regre_events_exist = True
+     for rt in range(len(regretags)):
+        rversion, rtune = regretags[rt].split("/")
+	if not xsec_id is None and not xsec_subpath is None:
+	   if rtune + "-xsec-" + xsec_id + "-" + rversion + ".root" not in os.listdir(regredir + "/" + regretags[rt] + xsec_subpath): 
+	       msg.info( "\t\tinput XSec for regression does NOT exits: " + regredir + "/" + regretags[rt] + xsec_subpath + rtune + "-xsec-" + vN + "-" + rversion + ".root " )
+	       regre_xsec_exists = False
+	regfiles = regredir + "/" + regretags[rt] + "/events/" + cmp_app + "/*.ghep.root"
+	retcode, nevfiles =  commands.getstatusoutput("ls -alF " + regfiles + " | wc -l")
+	if ( int(nevfiles) != nreqfiles ): 
+	   msg.info( "\t\tTune " + rtune + " : incorrect number of event samples for regression: " + nevfiles + "; it should be: " + str(nreqfiles) )
+	   regre_events_exist = False
+
+     return  ( regre_xsec_exists and  regre_events_exist )
+   
+  return False

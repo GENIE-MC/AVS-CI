@@ -1,6 +1,7 @@
 import msg
 import outputPaths
 import os
+import commonFunctions
 
 nuPDG = {
   '1000' :  '14',
@@ -722,6 +723,7 @@ def createFileList (tag, date, xsec_a_path, outEvent, outRep, main_tune, tunes, 
   else:
      print >>xml, '\t\t<xsec_file> input/' + main_tune + '-xsec-vA-' + tag + '.root </xsec_file>'
   print >>xml, '\t</model>'
+  
   # same for tunes if specified
   if not (tunes is None):
      for tn in range(len(tunes)):
@@ -730,7 +732,10 @@ def createFileList (tag, date, xsec_a_path, outEvent, outRep, main_tune, tunes, 
            print >>xml, '\t\t<evt_file format="ghep"> input/' + tunes[tn] + '-gntp.' + key + '.ghep.root </evt_file>'
         print >>xml, '\t\t<xsec_file> input/' + tunes[tn] + '-xsec-vA-' + tag + '.root </xsec_file>'
         print  >>xml, '\t</model>'  
-  if not (regretags is None):
+  
+  regreOK = commonFunctions.regreInputOK( "xsec_validation", regretags, regredir, len(nuPDG), "vA", "/xsec/nuA/" )
+  # --> if not (regretags is None):
+  if regreOK:
      # need to fetch date stamp for the regression from the leading path
      # assume that regredir is always /leading/path/to/TIMESTAMP/Index
      # NOTE: redirect output of split(...) to a separate array; 
@@ -745,10 +750,15 @@ def createFileList (tag, date, xsec_a_path, outEvent, outRep, main_tune, tunes, 
            print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] +'/gntp.' + key + '.ghep.root </evt_file>'
 	print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
         print >>xml, '\t</model>'
+  else:
+     msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )
+
   print >>xml, '</genie_simulation_outputs>'
   xml.close()
 
 def createCmpConfig( tag, date, reportdir ):
+
+   msg.info ("\tCreate configuration XML for xsec test\n")  
 
    # start GLOBAL CMP CONFIG
    for key in comparisons.iterkeys():
@@ -789,21 +799,29 @@ def fillDAG_cmp (jobsub, tag, date, xsec_a_path, outEvents, outRep, main_tune, t
   msg.info ("\tAdding xsec validation (data) jobs\n")    
 
   inputs = outRep + "/*.xml " + xsec_a_path + "/xsec-vA-" + tag + ".root " + outEvents + "/*.ghep.root "
+  
   if not (main_tune is None):
      inputs = outRep + "/*.xml " + xsec_a_path + "/" + main_tune +"-xsec-vA-" + tag + ".root " + outEvents + "/*.ghep.root "
+  
   if not ( tunes is None):
      for tn in range(len(tunes)):
         inputs = inputs + " " + xsec_a_path + "/" + tunes[tn] + "/" + tunes[tn] + "-xsec-vA-" + tag + ".root " + \
 	         outEvents + "/" + tunes[tn] + "/*.ghep.root"
+  
   # regression test if requested
   regre = None
   if not (regretags is None):
-     regre = ""
-     # NOTE: no need to fetch rdate here; it'll just be part of regre_dir "leading" path
-     for rt in range(len(regretags)):
-        rversion, rtune = regretags[rt].split("/")
-	regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
-	regre = regre + regredir + "/" + regretags[rt] + "/events/xsec_validation/*.ghep.root " 
+     regreOK = commonFunctions.regreInputOK( "xsec_validation", regretags, regredir, len(nuPDG), "vA", "/xsec/nuA/" )
+     if regreOK:
+        regre = ""
+        # NOTE: no need to fetch rdate here; it'll just be part of regre_dir "leading" path
+        for rt in range(len(regretags)):
+           rversion, rtune = regretags[rt].split("/")
+	   regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
+	   regre = regre + regredir + "/" + regretags[rt] + "/events/xsec_validation/*.ghep.root " 
+     else:
+        msg.info( "\t\tNO input for regression will be copied over \n" )
+	regre = None
 
   # in parallel mode
   jobsub.add ("<parallel>")

@@ -138,7 +138,9 @@ if __name__ == "__main__":
   minerva.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
   # T2K
   # NOTE (JVY): NO regression test so far since we don't have anything for T2k from GENIE v2_x_y
-  t2k.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, None, None )
+  # NOTE (JV): starting Feb.2019, add regression test since we now have some event files for T2K for master and/or R-3_00_xx series
+  t2k.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
   # MiniBooNE
   # NOTE (JVY): NO regression test so far since we don't have anything for MiniBooNE from GENIE v2_x_y
-  miniboone.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, None, None )
+  # NOTE (JV): starting Feb.2019, add regression test since we now have some event files for MiniBooNE for master and/or R-3_00_xx series
+  miniboone.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
