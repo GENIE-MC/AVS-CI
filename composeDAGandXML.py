@@ -15,7 +15,15 @@ import xsecval, minerva, t2k, miniboone
 # general
 import os, datetime
 
-# example format:
+#
+# Note: in the "guts" this machinery uses ifdh module 
+#       which is a python API to IFDH, a "local" FNAL set of tools
+#       in order to work, one must first set it up as follows:
+#       source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups.sh
+#       setup ifdhc
+#
+
+# Example format:
 # ./composeDAGandXML.py --genie_tag master  \ 
 #                          --build_date YYYY-MM-DD  \
 #                          --run_path /path/to/runGENIE.sh \ # e.g. /grid/fermiapp/genie/legacyValidation_update_1/runGENIE.sh
@@ -66,9 +74,13 @@ if __name__ == "__main__":
   if args.main_tune is None:
      args.main_tune = "Default"
   
+  if args.root_version is None:
+     args.root_version = "Root6"
+  
+  
   # print configuration summary
   initMessage (args)
-
+  
   # preapre folder(s) structure for output
   # 12/12/2018 - remove build_date from the path; it'll be embeded by the CI machinery
   #              instead, use (main_)tune
@@ -124,22 +136,30 @@ if __name__ == "__main__":
 
   # fill dag files with jobs
   msg.info ("Adding jobs to dag file: " + jobsub.dagFile + "\n")
+  
   # nucleon cross sections
   nun.fillDAG ( jobsub, args.tag, args.paths, args.main_tune, args.add_tunes )
+  
   # nucleus cross sections
   nua.fillDAG ( jobsub, args.tag, args.paths, args.main_tune, args.add_tunes )
+  
   # standard mc sanity check (events scan)
   standard.fillDAG( jobsub, args.tag, args.paths, args.main_tune ) # NO ADDITIONAL TUNES assumed !!!
+  
   # xsec validation
   xsecval.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir ) 
+  
   # hadronization test
   hadronization.fillDAG ( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
+  
   # MINERvA test
   minerva.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
+  
   # T2K
   # NOTE (JVY): NO regression test so far since we don't have anything for T2k from GENIE v2_x_y
   # NOTE (JV): starting Feb.2019, add regression test since we now have some event files for T2K for master and/or R-3_00_xx series
   t2k.fillDAG( jobsub, args.tag, args.build_date, args.paths, args.main_tune, args.add_tunes, args.regretags, args.regredir )
+  
   # MiniBooNE
   # NOTE (JVY): NO regression test so far since we don't have anything for MiniBooNE from GENIE v2_x_y
   # NOTE (JV): starting Feb.2019, add regression test since we now have some event files for MiniBooNE for master and/or R-3_00_xx series

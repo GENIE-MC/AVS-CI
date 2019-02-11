@@ -61,6 +61,13 @@ def getArgs(
 	   help = "default = "
 	   )
 
+# version of Root to be used in the build
+    parser.add_argument("--root_version", action = "store", dest = "root_version",
+           metavar = "version of Root (Root5 or Root6)", 
+	   help = "version of Root to be used in the build (Root5 or Root6)"
+	   )
+
+# define required commands; others would be optional
     required = parser.add_argument_group("required arguments")
     required.add_argument(
             "--genie_tag", action = "store", dest = "tag",

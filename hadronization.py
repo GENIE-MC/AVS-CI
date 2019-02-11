@@ -3,7 +3,6 @@
 import msg
 import outputPaths
 import os
-import commands
 import commonFunctions
 
 nuPDG = {

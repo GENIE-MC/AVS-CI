@@ -14,7 +14,8 @@ class Jobsub:
         # create dag file
         self.dagFile = args.paths['top'] + "/GENIE_CI_Validation-" + args.tag + \
                 "-" + args.build_date + ".dag"
-        # remove is the file exists
+        self.root_version = args.root_version.replace("Root","")
+	# remove is the file exists
         try:
             os.remove (self.dagFile)
         except OSError:
@@ -51,14 +52,16 @@ class Jobsub:
         # write full jobsub command to dag file
         if regre is None:
 	   print >>self.dag, self.basecmd + \
-                          " -i " + inputs + \
+			  " -R " + self.root_version + \
+			  " -i " + inputs + \
                           " -o " + output + \
                           " -l " + logfile + \
                           " -c " + cmd
 	else:
 	   regre = re.sub (" ", "SPACE", regre )
 	   print >>self.dag, self.basecmd + \
-                          " -i " + inputs + \
+                          " -R " + self.root_version + \
+			  " -i " + inputs + \
                           " -o " + output + \
                           " -l " + logfile + \
                           " -r " + regre + \

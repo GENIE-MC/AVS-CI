@@ -1,7 +1,19 @@
 
 import msg
 import os
-import commands
+
+# no need for commands package sinse IFDH functionalities are required 
+# to make it all work with dCache which is not mounted on a Jenkins build node
+# --> import commands
+
+# Note: ifdh module is a python API to IFDH toolkit that's "local FNAL development
+#       in order to make python find this module one must first setup IFDH as follows:
+#       source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups.sh
+#       setup ifdhc
+#
+import ifdh
+
+IFDH=ifdh.ifdh()
 
 # this is general enough to put in here 
 nevents="100000"
@@ -216,13 +228,29 @@ def regreInputOK( cmp_app, regretags, regredir, nreqfiles, xsec_id, xsec_subpath
      for rt in range(len(regretags)):
         rversion, rtune = regretags[rt].split("/")
 	if not xsec_id is None and not xsec_subpath is None:
-	   if rtune + "-xsec-" + xsec_id + "-" + rversion + ".root" not in os.listdir(regredir + "/" + regretags[rt] + xsec_subpath): 
+	   #
+	   # NOTE: this will NOT work for /pnfs on a Jenkins build node because dCache is NOT mounted there
+	   #
+	   # --> if rtune + "-xsec-" + xsec_id + "-" + rversion + ".root" not in os.listdir(regredir + "/" + regretags[rt] + xsec_subpath): 
+	   #
+	   # instead we have to use (pyton interface to) IFDH tools
+	   #
+	   xsec_found = IFDH.findMatchingFiles( regredir + "/" + regretags[rt] + xsec_subpath, rtune + "-xsec-" + xsec_id + "-" + rversion + ".root" )
+	   if ( len(xsec_found) <= 0 ):
 	       msg.info( "\t\tinput XSec for regression does NOT exits: " + regredir + "/" + regretags[rt] + xsec_subpath + rtune + "-xsec-" + vN + "-" + rversion + ".root " )
 	       regre_xsec_exists = False
-	regfiles = regredir + "/" + regretags[rt] + "/events/" + cmp_app + "/*.ghep.root"
-	retcode, nevfiles =  commands.getstatusoutput("ls -alF " + regfiles + " | wc -l")
-	if ( int(nevfiles) != nreqfiles ): 
-	   msg.info( "\t\tTune " + rtune + " : incorrect number of event samples for regression: " + nevfiles + "; it should be: " + str(nreqfiles) )
+	#
+	# NOTE: this will NOT work for /pnfs on a Jenkins build node because dCache is NOT mounted there
+	#
+	# --> regfiles = regredir + "/" + regretags[rt] + "/events/" + cmp_app + "/*.ghep.root"
+	# --> retcode, nevfiles =  commands.getstatusoutput("ls -alF " + regfiles + " | wc -l")
+	# --> if ( int(nevfiles) != nreqfiles ): 
+	#
+	# instead we have to use (pyton interface to) IFDH tools
+	#
+	evfiles_found = IFDH.findMatchingFiles( regredir + "/" + regretags[rt] + "/events/" + cmp_app + "/", "*.ghep.root" )	
+	if ( len(evfiles_found) != nreqfiles ): 
+	   msg.info( "\t\tTune " + rtune + " : incorrect number of event samples for regression: " + str(len(evfiles_found)) + "; it should be: " + str(nreqfiles) )
 	   regre_events_exist = False
 
      return  ( regre_xsec_exists and  regre_events_exist )
