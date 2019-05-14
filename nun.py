@@ -6,7 +6,8 @@ import re, os
 
 # NOTE-1 (JVY): as of 6/1/2018, reduce number of knots from 200 to 100
 # NOTE-2 (JVY): as of 6/6/2018, resume 200 knots
-nKnots    = "200" # no. of knots for gmkspl
+# NOTE-3 (JV): as of 5/14/2019, reduce to 100 again, due to significant slowdown in GENIE v3.0.4
+nKnots    = "100" # no. of knots for gmkspl
 maxEnergy = "500" # maximum energy for gmkspl
 
 data_struct = {
