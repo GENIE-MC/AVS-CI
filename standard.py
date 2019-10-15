@@ -114,7 +114,7 @@ generatorList = {
   '2103' : 'Default',
   '9001' : 'CharmCCDIS',
   '9002' : 'CharmCCQE',
-  '9101' : 'COH',
+  '9101' : 'COHPION',
   '9201' : 'NuEElastic',
   '9202' : 'NuEElastic',
   '9203' : 'IMD',

@@ -101,7 +101,7 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
      if key.find("CoherentPi") == -1:
         opt = options + " -n " + nevents
      else:
-        opt = options + " -n 10000 --event-generator-list COH "
+        opt = options + " -n 10000 --event-generator-list COHPION "
      if not ( main_tune is None):
         opt = opt + " --tune " + main_tune     
      cmd = "gevgen " + opt + " -p " + data_struct[key]['projectile'] + " -e " + data_struct[key]['energy'] + \
@@ -115,7 +115,7 @@ def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 	   if key.find("CoherentPi") == -1:
 	      optTune = " -t " + target + " --cross-sections input/" + tunes[tn] + "-gxspl-vA-" + tag + ".xml -n " + nevents
 	   else:
-	      optTune = " -t " + target + " --cross-sections input/" + tunes[tn] + "-gxspl-vA-" + tag + ".xml -n 10000 --event-generator-list COH "
+	      optTune = " -t " + target + " --cross-sections input/" + tunes[tn] + "-gxspl-vA-" + tag + ".xml -n 10000 --event-generator-list COHPION "
 	   cmdTune = "gevgen " + optTune + " --tune " + tunes[tn] + " -p " + data_struct[key]['projectile'] + " -e " + data_struct[key]['energy'] + \
 	             " -f " + data_struct[key]['flux'] + " -o " + tunes[tn] + "-gntp." + key + "-" + data_struct[key]['releaselabel'] + ".ghep.root"
 	   jobsub.addJob( xsec_a_path+"/"+tunes[tn]+"/"+tunes[tn]+"-"+inputxsec, out+"/"+tunes[tn], tunes[tn]+"-"+logfile, cmdTune, None )
