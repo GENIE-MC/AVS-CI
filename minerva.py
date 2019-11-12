@@ -77,7 +77,7 @@ def fillDAG( jobsub, tag, date, paths, main_tune, tunes, regretags, regredir ):
    outputPaths.expand( paths['minerva'], tunes )
    fillDAG_GHEP( jobsub, tag, paths['xsec_A'], paths['minerva'], main_tune, tunes )
    createCmpConfigs( tag, date, paths['minervarep'], main_tune, tunes, regretags, regredir )
-   fillDAG_cmp( jobsub, tag, date, paths['xsec_A'], paths['minerva'], paths['minervarep'], tunes, regretags, regredir ) # no need to pass in main_tune
+   fillDAG_cmp( jobsub, tag, date, paths['xsec_A'], paths['minerva'], paths['minervarep'], main_tune, tunes, regretags, regredir ) 
 
 def fillDAG_GHEP( jobsub, tag, xsec_a_path, out, main_tune, tunes ):
 
@@ -137,7 +137,8 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
    print >>gxml, '\t<experiment name="MINERvA">'
    print >>gxml, '\t\t<paths_relative_to_geniecmp_topdir> false </paths_relative_to_geniecmp_topdir>'
    
-   regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+   # --> now we need xsec --> regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+   regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), "vA", "/xsec/nuA" )
    
    # in the loop, create GSim cfg files and also put their names in the global cfg
    for key in data_struct.iterkeys():
@@ -154,6 +155,10 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
       else:
          print >>xml, '\t<model name="GENIE_' + tag + "-" + date + ':' + main_tune + ':' + data_struct[key]['releaselabel'] + '">'
       print >>xml, '\t\t<evt_file format="ghep"> input/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
+      if ( main_tune is None):
+         print >>xml, '\t\t<xsec_file> input/xsec-vA-' + tag + '.root </xsec_file>'
+      else:
+         print >>xml, '\t\t<xsec_file> input/' + main_tune + '-xsec-vA-' + tag + '.root </xsec_file>'
       print >>xml, '\t</model>'
       # tunes if specied
       if not (tunes is None):
@@ -164,21 +169,22 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
       # regression if specified (but not for COH pion since regression files seems corrupted)
       # backward compatibility repaired for COH (and perhaps others); so resume "full" regression  
       # if key.find("CoherentPi") == -1:
-      # --> if not (regretags is None):
-      if regreOK:         
-	 # need to fetch date stamp for the regression from the leading path
-         # assume that regredir is always /leading/path/to/TIMESTAMP/Index
-         # NOTE: redirect output of split(...) to a separate array; 
-         #       otherwise len(...) will be the length of regredir, not the length of array after splitting
-         regredir_tmp = regredir.split("/")
-         rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
-         for rt in range(len(regretags)):
-            rversion, rtune = regretags[rt].split("/") 
-	    print >>xml, '\t<model name="GENIE_' + rversion + '-' + rdate + ':' + rtune + ':' + data_struct[key]['releaselabel'] + '">'
-	    print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
-	    print >>xml, '\t</model>'
-      else:
-         msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )     
+      if not (regretags is None):
+         if regreOK:         
+	   # need to fetch date stamp for the regression from the leading path
+           # assume that regredir is always /leading/path/to/TIMESTAMP/Index
+           # NOTE: redirect output of split(...) to a separate array; 
+           #       otherwise len(...) will be the length of regredir, not the length of array after splitting
+           regredir_tmp = regredir.split("/")
+           rdate = regredir_tmp[len(regredir_tmp)-2] # i.e. one before the last     
+           for rt in range(len(regretags)):
+              rversion, rtune = regretags[rt].split("/") 
+	      print >>xml, '\t<model name="GENIE_' + rversion + '-' + rdate + ':' + rtune + ':' + data_struct[key]['releaselabel'] + '">'
+	      print >>xml, '\t\t<evt_file format="ghep"> input/regre/' + rdate + '/' + regretags[rt] + '/gntp.' + key + '-' + data_struct[key]['releaselabel'] + '.ghep.root </evt_file>'
+              print >>xml, '\t\t<xsec_file> input/regre/' + rdate + '/' + regretags[rt] + '/' + rtune + '-xsec-vA-' + rversion + '.root </xsec_file>'
+	      print >>xml, '\t</model>'
+         else:
+           msg.info( "\t\tNO REGRESSION due to missing/incorrect input files \n" )     
       
       print >>xml, '</genie_simulation_outputs>'
       xml.close()
@@ -200,7 +206,7 @@ def createCmpConfigs( tag, date, reportdir, main_tune, tunes, regretags, regredi
    print >>gxml, '</config>'
    gxml.close()
    
-def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, tunes, regretags, regredir ):
+def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, main_tune, tunes, regretags, regredir ):
 
    # check if job is done already
    if resultsExist ( tag, date, reportdir ):
@@ -218,23 +224,35 @@ def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, tunes, reg
    cmd = "gvld_general_comparison --no-root-output --global-config input/" + config + " -o " + plotfile 
    cmd = cmd + " --summary-chi2-table " + tablechi2
    cmd = cmd + " --summary-KS-table " + tableks
+   
    # add the command to dag
-   inputs = reportdir + "/*.xml " + eventdir + "/*.ghep.root "
+   # --> old format --> inputs = reportdir + "/*.xml " + eventdir + "/*.ghep.root "
+   inputs = reportdir + "/*.xml " + xsec_a_path + "/xsec-vA-" + tag + ".root " + eventdir + "/*.ghep.root "
+
+   if not (main_tune is None):
+      inputs = reportdir + "/*.xml " + xsec_a_path + "/" + main_tune + "-xsec-vA-" + tag + ".root " + eventdir + "/*.ghep.root "
    
    if not (tunes is None):
       for tn in range(len(tunes)):
-         inputs = " " + inputs + eventdir + "/" + tunes[tn] + "/*.ghep.root " 
+         # --> old format --> inputs = " " + inputs + eventdir + "/" + tunes[tn] + "/*.ghep.root " 
+	 inputs = " " + inputs + xsec_a_path + "/" + tunes[tn] + "/" + tunes[tn] + "-xsec-vA-" + tag + ".root " \
+	           + eventdir + "/" + tunes[tn] + "/*.ghep.root "
    
    logfile = "gvld_general_comparison.log"
    
    regre = None
    if not (regretags is None):
-      regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+      # --> now we need XSec --> regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), None, None )
+      regreOK = commonFunctions.regreInputOK( "minerva", regretags, regredir, len(data_struct), "vA", "/xsec/nuA" )
       if regreOK:
          regre = ""
          for rt in range(len(regretags)):
             # NOTE: no need to fetch rtune because we don't get xsec, otherwise it's part of regretags 
-	    regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
+	    # regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root " 
+	    # NOTE (11/12/19): now we DO NEED to fetch xsec...
+            rversion, rtune = regretags[rt].split("/")
+	    regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
+            regre = regre + regredir + "/" + regretags[rt] + "/events/" + bname + "/*.ghep.root "
       else:
          msg.info( "\t\tNO input for regression will be copied over \n" )
 	 regre = None
