@@ -252,7 +252,7 @@ def fillDAG_cmp( jobsub, tag, date, xsec_a_path, eventdir, reportdir, main_tune,
 	    # NOTE (11/12/19): now we DO NEED to fetch xsec...
             rversion, rtune = regretags[rt].split("/")
 	    regre = regre + regredir + "/" + regretags[rt] + "/xsec/nuA/" + rtune + "-xsec-vA-" + rversion + ".root " 
-            regre = regre + regredir + "/" + regretags[rt] + "/events/" + bname + "/*.ghep.root "
+            regre = regre + regredir + "/" + regretags[rt] + "/events/minerva/*.ghep.root "
       else:
          msg.info( "\t\tNO input for regression will be copied over \n" )
 	 regre = None
